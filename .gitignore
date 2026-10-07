@@ -1,0 +1,28 @@
+﻿# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Python
+__pycache__/
+*.py[cod]
+*.class
+*.so
+
+# Application Logs and Caches
+*.log
+mic_config.json
+
+# Vosk Model (too large for git, instruct users to download)
+model/
+
+# VS Code
+.vscode/
+
+# System Files
+.DS_Store
+Thumbs.db
