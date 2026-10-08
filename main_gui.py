@@ -21,6 +21,13 @@ from dotenv import load_dotenv
 # Load API Key securely from .env
 load_dotenv()
 
+import ctypes
+kernel32 = ctypes.windll.kernel32
+_alfred_mutex = kernel32.CreateMutexW(None, True, "AlfredAssistantRunningMutex")
+if kernel32.GetLastError() == 183: # ERROR_ALREADY_EXISTS
+    sys.exit(0) # Prevent multiple GUI instances natively
+
+
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, 
     QMenu
@@ -257,8 +264,6 @@ class AlfredApp(QMainWindow):
                 self.speaker_cooldown = 0
                 if getattr(self, 'pending_exit', False) and empty_ticks > 20:
                     # 1 second of network silence confirms the goodbye audio has fully played out
-                    with open("debug.log", "a") as f:
-                        f.write("QUEUE EMPTY AND EXIT PENDING -> SHUTTING DOWN\n")
                     self.cancel_event.set()
                     break
                 continue
@@ -330,8 +335,6 @@ class AlfredApp(QMainWindow):
                         if content.turn_complete:
                             if getattr(self, 'pending_exit', False):
                                 self.turn_completed_after_exit = True
-                                with open("debug.log", "a") as f:
-                                    f.write("TURN COMPLETE AFTER EXIT SET\n")
                             with open("gemini_transcript.log", "a") as f:
                                 f.write("--- TURN COMPLETE ---\n")
                             
@@ -428,8 +431,6 @@ class AlfredApp(QMainWindow):
                                 function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response=out))
                                 
                             elif fc.name == "close_assistant":
-                                with open("debug.log", "a") as f:
-                                    f.write("TOOL CALL: close_assistant\n")
                                 self.pending_exit = True
                                 function_responses.append(types.FunctionResponse(
                                     id=fc.id, 
