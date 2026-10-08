@@ -144,6 +144,16 @@ def listen_loop():
                 data = audio_queue.get(timeout=0.1)
             except:
                 continue
+                
+            # OPTIMIZATION: Dynamic Noise Gate. 
+            # Don't waste C++ CPU cycles running FFTs on complete silence!
+            import audioop
+            try:
+                rms = audioop.rms(data, 2)
+                if rms < 300: # Threshold for whisper/silence
+                    continue
+            except:
+                pass
             
             if recognizer.AcceptWaveform(data):
                 res = json.loads(recognizer.Result())
