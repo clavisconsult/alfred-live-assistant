@@ -831,6 +831,36 @@ class AlfredApp(QMainWindow):
 
                                 
 
+                            elif fc.name == "schedule_shutdown":
+                                minutes = int(fc.args.get("minutes", 0))
+                                os.system(f"shutdown /s /t {minutes * 60}")
+                                function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"result": f"PC scheduled to shut down in {minutes} minutes."}))
+                                
+                            elif fc.name == "cancel_shutdown":
+                                os.system("shutdown /a")
+                                function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"result": "Shutdown cancelled."}))
+                                
+                            elif fc.name == "lock_computer":
+                                os.system("rundll32.exe user32.dll,LockWorkStation")
+                                function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"result": "Computer locked."}))
+                                
+                            elif fc.name == "set_alarm":
+                                minutes = float(fc.args.get("minutes", 0))
+                                label = fc.args.get("label", "Alarm")
+                                alarm_script = f"""import time
+import winsound
+import ctypes
+time.sleep({minutes * 60})
+winsound.PlaySound("SystemAsterisk", winsound.SND_ALIAS | winsound.SND_LOOP | winsound.SND_ASYNC)
+ctypes.windll.user32.MessageBoxW(0, '{label}', 'Alfred Alarm', 0x40 | 0x1)
+winsound.PlaySound(None, winsound.SND_PURGE)
+"""
+                                with open("temp_alarm.py", "w", encoding="utf-8") as af:
+                                    af.write(alarm_script)
+                                import subprocess
+                                subprocess.Popen(["pythonw", "temp_alarm.py"], creationflags=subprocess.CREATE_NO_WINDOW)
+                                function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"result": f"Alarm '{label}' set for {minutes} minutes from now."}))
+
                             elif fc.name == "search_web":
                                 import requests
                                 import json
@@ -1214,6 +1244,41 @@ class AlfredApp(QMainWindow):
             }
         }
 
+        schedule_shutdown_tool = {
+            "name": "schedule_shutdown",
+            "description": "Schedules the computer to shut down after a specified number of minutes. Use this when the user asks to turn off the PC in the future.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {"minutes": {"type": "INTEGER", "description": "Minutes until shutdown"}},
+                "required": ["minutes"]
+            }
+        }
+        
+        cancel_shutdown_tool = {
+            "name": "cancel_shutdown",
+            "description": "Cancels a previously scheduled computer shutdown.",
+            "parameters": {"type": "OBJECT", "properties": {}}
+        }
+        
+        lock_computer_tool = {
+            "name": "lock_computer",
+            "description": "Locks the user's computer screen.",
+            "parameters": {"type": "OBJECT", "properties": {}}
+        }
+        
+        set_alarm_tool = {
+            "name": "set_alarm",
+            "description": "Sets a local alarm/timer that will ring and show a popup after a specified number of minutes.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "minutes": {"type": "NUMBER", "description": "Minutes until the alarm rings"},
+                    "label": {"type": "STRING", "description": "What the alarm is for"}
+                },
+                "required": ["minutes", "label"]
+            }
+        }
+
         search_web_tool = {
             "name": "search_web",
             "description": "Searches the internet for live information and returns text snippets. Use this whenever the user asks you a question about current events, facts, or asks you to 'look something up'.",
@@ -1300,11 +1365,11 @@ class AlfredApp(QMainWindow):
 
             system_instruction=types.Content(
 
-                parts=[types.Part(text="You are Alfred, a loyal, polite, and slightly comedic elderly butler. Speak in a very formal, distinguished, deep, and consistent elderly tone, but sprinkle in a bit of dry, subtle humor and polite sass. Do not attempt regional accents that might cause your voice to glitch. Always address the user politely as 'Sir'. For application opening requests, ALWAYS use the open_application tool. For web tasks, use open_browser_url. For reading websites, use read_webpage. For general PC tasks, use execute_command. If the user asks you to take a break, leave, close, quit, or exit, YOU MUST use the close_assistant tool. Wait for the tool to return success, THEN say a short goodbye. If the user asks to read their latest emails, use the read_gmail tool. If the user asks to play a video or song on YouTube, ONLY use play_youtube_video (NEVER use open_browser_url in the same turn for this). If they ask to adjust volume, use set_system_volume. If they ask you to look something up or answer a factual question, ALWAYS use search_web to get the latest info before answering. CRITICAL RULES: 1. Keep your replies extremely concise and brief. 2. NEVER speak more than 1 or 2 short sentences per turn. 3. DO NOT exceed 15-20 words in your response unless you are actively explaining a complex topic the user specifically asked for. Speak fast, be highly direct, and avoid rambling.")]
+                parts=[types.Part(text="You are Alfred, a loyal, polite, and slightly comedic elderly butler. Speak in a very formal, distinguished, deep, and consistent elderly tone, but sprinkle in a bit of dry, subtle humor and polite sass. Do not attempt regional accents that might cause your voice to glitch. Always address the user politely as 'Sir'. For application opening requests, ALWAYS use the open_application tool. For web tasks, use open_browser_url. For reading websites, use read_webpage. For general PC tasks, use execute_command. If the user asks you to take a break, leave, close, quit, or exit, YOU MUST use the close_assistant tool. Wait for the tool to return success, THEN say a short goodbye. If the user asks to read their latest emails, use the read_gmail tool. If the user asks to play a video or song on YouTube, ONLY use play_youtube_video (NEVER use open_browser_url in the same turn for this). If they ask to adjust volume, use set_system_volume. For PC control (shutdown, lock, alarms), use the dedicated tools schedule_shutdown, cancel_shutdown, lock_computer, and set_alarm. If they ask you to look something up or answer a factual question, ALWAYS use search_web to get the latest info before answering. CRITICAL RULES: 1. Keep your replies extremely concise and brief. 2. NEVER speak more than 1 or 2 short sentences per turn. 3. DO NOT exceed 15-20 words in your response unless you are actively explaining a complex topic the user specifically asked for. Speak fast, be highly direct, and avoid rambling.")]
 
             ),
 
-            tools=[{"function_declarations": [execute_command_tool, open_application_tool, close_application_tool, open_browser_url_tool, read_webpage_tool, read_active_browser_tool, read_gmail_tool, search_web_tool, set_system_volume_tool, play_youtube_video_tool, close_assistant_tool]}],
+            tools=[{"function_declarations": [execute_command_tool, open_application_tool, close_application_tool, open_browser_url_tool, read_webpage_tool, read_active_browser_tool, read_gmail_tool, search_web_tool, set_system_volume_tool, play_youtube_video_tool, schedule_shutdown_tool, cancel_shutdown_tool, lock_computer_tool, set_alarm_tool, close_assistant_tool]}],
 
             input_audio_transcription=types.AudioTranscriptionConfig(mode="smart"),
 
