@@ -4,7 +4,7 @@ memory_manager = MemoryManager()
 # Global App Cache for O(1) Instant Application Launching
 global_app_cache = {}
 def _build_app_cache():
-    bad_words = ["readme", "help", "setup", "install", "url", "website", "reset", "safe mode", "config"]
+    bad_words = ["uninstall", "readme", "help", "setup", "install", "url", "website", "reset", "safe mode", "config"]
     paths = [
         os.path.join(os.environ.get("APPDATA", ""), r"Microsoft\Windows\Start Menu\Programs"),
         r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs",
@@ -781,7 +781,7 @@ class AlfredApp(QMainWindow):
                                     ]
                                     
                                     import traceback
-                                    bad_words = ["readme", "help", "setup", "install", "url", "website", "reset", "safe mode", "config"]
+                                    bad_words = ["uninstall", "readme", "help", "setup", "install", "url", "website", "reset", "safe mode", "config"]
                                     
                                     def is_valid_lnk(fname):
                                         fl = fname.lower()
