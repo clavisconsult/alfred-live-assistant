@@ -847,18 +847,10 @@ class AlfredApp(QMainWindow):
                             elif fc.name == "set_alarm":
                                 minutes = float(fc.args.get("minutes", 0))
                                 label = fc.args.get("label", "Alarm")
-                                alarm_script = f"""import time
-import winsound
-import ctypes
-time.sleep({minutes * 60})
-winsound.PlaySound("SystemAsterisk", winsound.SND_ALIAS | winsound.SND_LOOP | winsound.SND_ASYNC)
-ctypes.windll.user32.MessageBoxW(0, '{label}', 'Alfred Alarm', 0x40 | 0x1)
-winsound.PlaySound(None, winsound.SND_PURGE)
-"""
-                                with open("temp_alarm.py", "w", encoding="utf-8") as af:
-                                    af.write(alarm_script)
                                 import subprocess
-                                subprocess.Popen(["pythonw", "temp_alarm.py"], creationflags=subprocess.CREATE_NO_WINDOW)
+                                import os
+                                timer_script = os.path.join(os.path.dirname(__file__), "alfred_timer.py")
+                                subprocess.Popen(["pythonw", timer_script, str(minutes), label], creationflags=subprocess.CREATE_NO_WINDOW)
                                 function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"result": f"Alarm '{label}' set for {minutes} minutes from now."}))
 
                             elif fc.name == "search_web":
