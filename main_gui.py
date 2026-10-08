@@ -851,6 +851,67 @@ class AlfredApp(QMainWindow):
 
                                 
 
+                            elif fc.name == "read_gmail":
+                                import imaplib
+                                import email
+                                from email.header import decode_header
+                                
+                                count = fc.args.get("count", 5)
+                                gmail_user = os.environ.get("GMAIL_ADDRESS")
+                                gmail_pass = os.environ.get("GMAIL_APP_PASSWORD")
+                                
+                                if not gmail_user or not gmail_pass:
+                                    resp = "Error: Credentials missing. Tell the user exactly this: 'To read your Gmail, you need to add GMAIL_ADDRESS and GMAIL_APP_PASSWORD to your .env file. The password must be a 16-letter App Password generated from your Google Account Security settings.'"
+                                    function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": resp}))
+                                else:
+                                    try:
+                                        mail = imaplib.IMAP4_SSL("imap.gmail.com")
+                                        mail.login(gmail_user, gmail_pass)
+                                        mail.select("inbox")
+                                        
+                                        status, messages = mail.search(None, '(UNSEEN)')
+                                        if status == "OK" and messages[0]:
+                                            msg_ids = messages[0].split()
+                                            latest_msg_ids = msg_ids[-int(count):]
+                                            
+                                            emails_data = []
+                                            for msg_id in latest_msg_ids:
+                                                res, msg_data = mail.fetch(msg_id, "(RFC822)")
+                                                for response_part in msg_data:
+                                                    if isinstance(response_part, tuple):
+                                                        msg = email.message_from_bytes(response_part[1])
+                                                        
+                                                        subject_header = decode_header(msg["Subject"])[0]
+                                                        subject = subject_header[0]
+                                                        if isinstance(subject, bytes):
+                                                            subject = subject.decode(subject_header[1] if subject_header[1] else "utf-8", errors="ignore")
+                                                            
+                                                        sender_header = decode_header(msg.get("From"))[0]
+                                                        sender = sender_header[0]
+                                                        if isinstance(sender, bytes):
+                                                            sender = sender.decode(sender_header[1] if sender_header[1] else "utf-8", errors="ignore")
+                                                        
+                                                        body = ""
+                                                        if msg.is_multipart():
+                                                            for part in msg.walk():
+                                                                if part.get_content_type() == "text/plain":
+                                                                    try:
+                                                                        body = part.get_payload(decode=True).decode(errors="ignore")
+                                                                        break
+                                                                    except: pass
+                                                        else:
+                                                            try:
+                                                                body = msg.get_payload(decode=True).decode(errors="ignore")
+                                                            except: pass
+                                                            
+                                                        emails_data.append({"From": sender, "Subject": subject, "Snippet": body[:500]})
+                                            mail.logout()
+                                            function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"emails": emails_data}))
+                                        else:
+                                            mail.logout()
+                                            function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"result": "You have no unread emails in Gmail."}))
+                                    except Exception as e:
+                                        function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": f"Failed to read Gmail: {str(e)}"}))
                             elif fc.name == "read_active_browser":
                                 import uiautomation as auto
                                 import pyautogui
@@ -1058,6 +1119,17 @@ class AlfredApp(QMainWindow):
             }
         }
 
+        read_gmail_tool = {
+            "name": "read_gmail",
+            "description": "Reads the user's latest unread emails from Gmail. Use this when they ask you to check their Gmail or read their latest emails.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "count": {"type": "INTEGER", "description": "Number of emails to read (default 5)"}
+                }
+            }
+        }
+
         open_browser_url_tool = {
 
             "name": "open_browser_url",
@@ -1118,7 +1190,7 @@ class AlfredApp(QMainWindow):
 
             ),
 
-            tools=[{"function_declarations": [execute_command_tool, open_application_tool, close_application_tool, open_browser_url_tool, read_webpage_tool, read_active_browser_tool, close_assistant_tool]}],
+            tools=[{"function_declarations": [execute_command_tool, open_application_tool, close_application_tool, open_browser_url_tool, read_webpage_tool, read_active_browser_tool, read_gmail_tool, close_assistant_tool]}],
 
             input_audio_transcription=types.AudioTranscriptionConfig(mode="smart"),
 
