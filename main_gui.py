@@ -722,113 +722,70 @@ class AlfredApp(QMainWindow):
                                     id=fc.id, name=fc.name, response={"result": f"Sent command to close {app_name}."}
                                 ))
                             elif fc.name == "open_application":
-
                                 app_name = fc.args.get("app_name", "")
-
-                                ps_command = f"""
-
-                                $appName = "{app_name}".ToLower().Trim()
-
                                 
-
-                                # 1. Known Windows aliases and protocols
-
-                                $aliases = @{{
-
-                                    "settings" = "ms-settings:"
-
-                                    "windows settings" = "ms-settings:"
-
-                                    "calculator" = "calc"
-
-                                    "calc" = "calc"
-
-                                    "notepad" = "notepad"
-
-                                    "task manager" = "taskmgr"
-
-                                    "control panel" = "control"
-
-                                    "file explorer" = "explorer"
-
-                                    "explorer" = "explorer"
-
-                                    "command prompt" = "cmd"
-
-                                    "cmd" = "cmd"
-
-                                    "word" = "winword"
-
-                                    "excel" = "excel"
-
-                                    "powerpoint" = "powerpnt"
-
-                                    "browser" = "https://www.google.com"
-
-                                }}
-
-                                
-
-                                if ($aliases.ContainsKey($appName)) {{
-
-                                    Start-Process $aliases[$appName]
-
-                                    Write-Output "Successfully opened $appName"
-
-                                    exit
-
-                                }}
-
-                                
-
-                                # 2. Search for shortcuts
-
-                                $search = "*$appName*.lnk"
-
-                                $paths = @("$env:ProgramData\\Microsoft\\Windows\\Start Menu\\Programs", "$env:APPDATA\\Microsoft\\Windows\\Start Menu\\Programs", "$env:PUBLIC\\Desktop", "$env:USERPROFILE\\Desktop")
-
-                                $shortcut = Get-ChildItem -Path $paths -Recurse -Filter $search -ErrorAction SilentlyContinue | Select-Object -First 1
-
-                                
-
-                                if ($shortcut) {{
-
-                                    Invoke-Item $shortcut.FullName
-
-                                    Write-Output "Successfully opened $($shortcut.Name)"
-
-                                    exit
-
-                                }}
-
-                                
-
-                                # 3. Fallback to PATH executables
-
-                                try {{
-
-                                    Start-Process "{app_name}" -ErrorAction Stop
-
-                                    Write-Output "Successfully opened {app_name}"
-
-                                }} catch {{
-
-                                    Write-Error "Could not find application: {app_name}. Please check the spelling or ensure it is installed."
-
-                                }}
-
-                                """
-
-                                try:
-
-                                    result = subprocess.check_output(["powershell", "-Command", ps_command], text=True, stderr=subprocess.STDOUT)
-
-                                    out = {"result": result[:1000]}
-
-                                except Exception as e:
-
-                                    out = {"error": str(e)[:1000]}
-
+                                def _open_app():
+                                    clean_name = app_name.replace("application", "").replace("app", "").replace(".exe", "").strip().lower()
+                                    
+                                    aliases = {
+                                        "settings": "ms-settings:", "windows settings": "ms-settings:",
+                                        "calculator": "calc", "calc": "calc", "notepad": "notepad",
+                                        "task manager": "taskmgr", "explorer": "explorer",
+                                        "file explorer": "explorer", "paint": "mspaint", "cmd": "cmd",
+                                        "command prompt": "cmd", "control panel": "control", "wordpad": "write",
+                                        "clock": "ms-clock:", "alarms": "ms-clock:", "steam": "steam://open/main",
+                                        "discord": "discord:", "spotify": "spotify:"
+                                    }
+                                    
+                                    if clean_name in aliases:
+                                        try:
+                                            os.startfile(aliases[clean_name])
+                                            return {"result": f"Successfully launched {app_name} via native protocol."}
+                                        except: pass
+                                        
+                                    paths = [
+                                        os.path.join(os.environ.get("APPDATA", ""), r"Microsoft\Windows\Start Menu\Programs"),
+                                        r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs",
+                                        os.path.join(os.environ.get("USERPROFILE", ""), "Desktop"),
+                                        r"C:\Users\Public\Desktop"
+                                    ]
+                                    
+                                    import traceback
+                                    
+                                    # 1. Try substring match on shortcuts
+                                    for p in paths:
+                                        if os.path.exists(p):
+                                            try:
+                                                for root, dirs, files in os.walk(p):
+                                                    for f in files:
+                                                        if f.endswith(".lnk") and clean_name in f.lower():
+                                                            os.startfile(os.path.join(root, f))
+                                                            return {"result": f"Successfully opened {f}."}
+                                            except: continue
+                                                        
+                                    # 2. Try token/fuzzy match (e.g. "steam client" matches "Steam.lnk")
+                                    tokens = [t for t in clean_name.split() if len(t) > 2]
+                                    if tokens:
+                                        for p in paths:
+                                            if os.path.exists(p):
+                                                try:
+                                                    for root, dirs, files in os.walk(p):
+                                                        for f in files:
+                                                            if f.endswith(".lnk"):
+                                                                f_lower = f.lower()
+                                                                if any(t in f_lower for t in tokens):
+                                                                    os.startfile(os.path.join(root, f))
+                                                                    return {"result": f"Successfully opened {f} via fuzzy match."}
+                                                except: continue
+                                                                
+                                    # 3. Fallback direct execution
+                                    try:
+                                        os.startfile(clean_name)
+                                        return {"result": f"Launched {clean_name} directly."}
+                                    except Exception as e:
+                                        return {"error": f"Could not find or launch application '{app_name}'. Error: {e}"}
+                                        
+                                out = await asyncio.to_thread(_open_app)
                                 function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response=out))
 
                                 
