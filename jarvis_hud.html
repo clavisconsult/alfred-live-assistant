@@ -218,8 +218,13 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
     }
 
-    function animate() {
+    let lastTime = 0;
+    function animate(currentTime) {
         requestAnimationFrame(animate);
+        
+        // Optimization: Cap the orb rendering to 60 FPS to save GPU on high-refresh-rate (144Hz+) gaming monitors
+        if (currentTime - lastTime < 16) return;
+        lastTime = currentTime;
 
         time += 0.02;
         uniforms.uTime.value = time;
