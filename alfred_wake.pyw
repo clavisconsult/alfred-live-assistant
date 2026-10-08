@@ -60,7 +60,8 @@ except Exception as e:
         f.write(f"Model failed: {e}\n")
     sys.exit(1)
 
-recognizer = vosk.KaldiRecognizer(model, 16000)
+grammar = '["alfred", "hey alfred", "wake up alfred", "hello alfred", "[unk]"]'
+recognizer = vosk.KaldiRecognizer(model, 16000, grammar)
 
 
 
@@ -165,6 +166,13 @@ def listen_loop():
         except Exception as e:
             with open("fatal_crash.log", "a") as f:
                 f.write(f"Loop caught exception: {e}\n")
+            if stream is not None:
+                try:
+                    stream.stop_stream()
+                    stream.close()
+                except:
+                    pass
+                stream = None
             time.sleep(1)
 
 if __name__ == "__main__":
