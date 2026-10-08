@@ -1172,6 +1172,11 @@ class AlfredApp(QMainWindow):
 
                                 
 
+                            elif fc.name == "update_memory":
+                                topic = fc.args.get("topic")
+                                details = fc.args.get("details")
+                                memory_manager.remember(topic, details)
+                                function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"result": f"Successfully committed to permanent memory under topic: {topic}"}))
                             elif fc.name == "change_voice":
                                 voice_name = fc.args.get("voice_name", "Charon").capitalize()
                                 valid_voices = ["Aoede", "Charon", "Fenrir", "Kore", "Puck"]
@@ -1447,6 +1452,19 @@ class AlfredApp(QMainWindow):
 
         
 
+        update_memory_tool = {
+            "name": "update_memory",
+            "description": "Saves important facts, user preferences, or conversation summaries into your permanent long-term memory.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "topic": {"type": "STRING", "description": "The category or topic (e.g., 'User Name', 'Favorite Food', 'Last Conversation Summary')"},
+                    "details": {"type": "STRING", "description": "The detailed facts to remember forever."}
+                },
+                "required": ["topic", "details"]
+            }
+        }
+
         change_voice_tool = {
             "name": "change_voice",
             "description": "Changes your speaking voice. Available voices: Aoede (Female), Charon (Deep Male), Fenrir (Gruff Male), Kore (Bright Female), Puck (Energetic Male).",
@@ -1487,7 +1505,7 @@ class AlfredApp(QMainWindow):
 
             ),
 
-            tools=[{"function_declarations": [execute_command_tool, open_application_tool, close_application_tool, open_browser_url_tool, read_webpage_tool, read_active_browser_tool, read_gmail_tool, search_web_tool, set_system_volume_tool, play_youtube_video_tool, schedule_shutdown_tool, cancel_shutdown_tool, lock_computer_tool, set_alarm_tool, list_alarms_tool, cancel_alarm_tool, change_voice_tool, close_assistant_tool]}],
+            tools=[{"function_declarations": [execute_command_tool, open_application_tool, close_application_tool, open_browser_url_tool, read_webpage_tool, read_active_browser_tool, read_gmail_tool, search_web_tool, set_system_volume_tool, play_youtube_video_tool, schedule_shutdown_tool, cancel_shutdown_tool, lock_computer_tool, set_alarm_tool, list_alarms_tool, cancel_alarm_tool, update_memory_tool, change_voice_tool, close_assistant_tool]}],
 
             input_audio_transcription=types.AudioTranscriptionConfig(mode="smart"),
 
