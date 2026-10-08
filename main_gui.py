@@ -4,7 +4,7 @@ memory_manager = MemoryManager()
 # Global App Cache for O(1) Instant Application Launching
 global_app_cache = {}
 def _build_app_cache():
-    bad_words = ["uninstall", "readme", "help", "setup", "install", "url", "website"]
+    bad_words = ["uninstall", "readme", "help", "setup", "install", "url", "website", "reset", "safe mode", "config"]
     paths = [
         os.path.join(os.environ.get("APPDATA", ""), r"Microsoft\Windows\Start Menu\Programs"),
         r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs",
@@ -758,8 +758,13 @@ class AlfredApp(QMainWindow):
                                         "file explorer": "explorer", "paint": "mspaint", "cmd": "cmd",
                                         "command prompt": "cmd", "control panel": "control", "wordpad": "write",
                                         "clock": "ms-clock:", "alarms": "ms-clock:", "steam": "steam://open/main",
-                                        "discord": "discord:", "spotify": "spotify:", "word": "winword", 
-                                        "excel": "excel", "powerpoint": "powerpnt"
+                                        "discord": "Update.exe --processStart Discord.exe", "spotify": "spotify:",
+                                        "word": "winword", "excel": "excel", "powerpoint": "powerpnt",
+                                        "chrome": "chrome", "google chrome": "chrome", "edge": "msedge",
+                                        "microsoft edge": "msedge", "firefox": "firefox", "snipping tool": "snippingtool",
+                                        "photos": "ms-photos:", "camera": "microsoft.windows.camera:",
+                                        "mail": "outlookmail:", "calendar": "outlookcal:", "weather": "msnweather:",
+                                        "maps": "bingmaps:", "vlc": "vlc", "obs": "obs64"
                                     }
                                     
                                     if clean_name in aliases:
@@ -776,7 +781,7 @@ class AlfredApp(QMainWindow):
                                     ]
                                     
                                     import traceback
-                                    bad_words = ["uninstall", "readme", "help", "setup", "install", "url", "website"]
+                                    bad_words = ["uninstall", "readme", "help", "setup", "install", "url", "website", "reset", "safe mode", "config"]
                                     
                                     def is_valid_lnk(fname):
                                         fl = fname.lower()
