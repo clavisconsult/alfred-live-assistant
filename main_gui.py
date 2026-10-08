@@ -311,6 +311,7 @@ class AlfredApp(QMainWindow):
 
     async def audio_output_task(self, session):
         from google.genai import types
+        import json
         try:
             while not self.cancel_event.is_set():
                 async for response in session.receive():
@@ -454,7 +455,6 @@ class AlfredApp(QMainWindow):
     async def main_async(self, loop):
         try:
             from google import genai
-            from google.genai import types
             client = genai.Client()
         except Exception as e:
             with open("gui_error.log", "a") as f:
