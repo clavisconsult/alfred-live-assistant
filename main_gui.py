@@ -1,5 +1,29 @@
 from memory_manager import MemoryManager
 memory_manager = MemoryManager()
+
+# Global App Cache for O(1) Instant Application Launching
+global_app_cache = {}
+def _build_app_cache():
+    bad_words = ["uninstall", "readme", "help", "setup", "install", "url", "website"]
+    paths = [
+        os.path.join(os.environ.get("APPDATA", ""), r"Microsoft\Windows\Start Menu\Programs"),
+        r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs",
+        os.path.join(os.environ.get("USERPROFILE", ""), "Desktop"),
+        r"C:\Users\Public\Desktop"
+    ]
+    for p in paths:
+        if os.path.exists(p):
+            for root, dirs, files in os.walk(p):
+                for f in files:
+                    fl = f.lower()
+                    if fl.endswith(".lnk") and not any(bw in fl for bw in bad_words):
+                        # Store by exact lowercase name without .lnk
+                        name_key = fl.replace(".lnk", "")
+                        if name_key not in global_app_cache:
+                            global_app_cache[name_key] = os.path.join(root, f)
+
+threading.Thread(target=_build_app_cache, daemon=True).start()
+
 import sys
 
 import os
@@ -734,7 +758,8 @@ class AlfredApp(QMainWindow):
                                         "file explorer": "explorer", "paint": "mspaint", "cmd": "cmd",
                                         "command prompt": "cmd", "control panel": "control", "wordpad": "write",
                                         "clock": "ms-clock:", "alarms": "ms-clock:", "steam": "steam://open/main",
-                                        "discord": "discord:", "spotify": "spotify:"
+                                        "discord": "discord:", "spotify": "spotify:", "word": "winword", 
+                                        "excel": "excel", "powerpoint": "powerpnt"
                                     }
                                     
                                     if clean_name in aliases:
@@ -751,34 +776,55 @@ class AlfredApp(QMainWindow):
                                     ]
                                     
                                     import traceback
+                                    bad_words = ["uninstall", "readme", "help", "setup", "install", "url", "website"]
                                     
-                                    # 1. Try substring match on shortcuts
+                                    def is_valid_lnk(fname):
+                                        fl = fname.lower()
+                                        return fl.endswith(".lnk") and not any(bw in fl for bw in bad_words)
+
+                                    # 1. Try O(1) RAM Cache EXACT match
+                                    if clean_name in global_app_cache:
+                                        try:
+                                            os.startfile(global_app_cache[clean_name])
+                                            return {"result": f"Successfully opened {clean_name} via RAM cache."}
+                                        except: pass
+
+                                    # 1b. Try EXACT shortcut name match (fallback)
                                     for p in paths:
                                         if os.path.exists(p):
-                                            try:
-                                                for root, dirs, files in os.walk(p):
-                                                    for f in files:
-                                                        if f.endswith(".lnk") and clean_name in f.lower():
+                                            for root, dirs, files in os.walk(p):
+                                                for f in files:
+                                                    if is_valid_lnk(f) and f.lower().replace(".lnk", "") == clean_name:
+                                                        try:
                                                             os.startfile(os.path.join(root, f))
                                                             return {"result": f"Successfully opened {f}."}
-                                            except: continue
+                                                        except: pass
                                                         
-                                    # 2. Try token/fuzzy match (e.g. "steam client" matches "Steam.lnk")
+                                    # 2. Try Substring Prefix match (e.g. "Steam" matches "Steam Client.lnk" but avoids "Old Steam.lnk")
+                                    for p in paths:
+                                        if os.path.exists(p):
+                                            for root, dirs, files in os.walk(p):
+                                                for f in files:
+                                                    if is_valid_lnk(f) and f.lower().startswith(clean_name):
+                                                        try:
+                                                            os.startfile(os.path.join(root, f))
+                                                            return {"result": f"Successfully opened {f}."}
+                                                        except: pass
+
+                                    # 3. Try fuzzy/token match anywhere
                                     tokens = [t for t in clean_name.split() if len(t) > 2]
                                     if tokens:
                                         for p in paths:
                                             if os.path.exists(p):
-                                                try:
-                                                    for root, dirs, files in os.walk(p):
-                                                        for f in files:
-                                                            if f.endswith(".lnk"):
-                                                                f_lower = f.lower()
-                                                                if any(t in f_lower for t in tokens):
-                                                                    os.startfile(os.path.join(root, f))
-                                                                    return {"result": f"Successfully opened {f} via fuzzy match."}
-                                                except: continue
+                                                for root, dirs, files in os.walk(p):
+                                                    for f in files:
+                                                        if is_valid_lnk(f) and any(t in f.lower() for t in tokens):
+                                                            try:
+                                                                os.startfile(os.path.join(root, f))
+                                                                return {"result": f"Successfully opened {f} via fuzzy match."}
+                                                            except: pass
                                                                 
-                                    # 3. Fallback direct execution
+                                    # 4. Fallback direct execution
                                     try:
                                         os.startfile(clean_name)
                                         return {"result": f"Launched {clean_name} directly."}
