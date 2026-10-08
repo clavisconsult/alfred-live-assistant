@@ -863,22 +863,42 @@ class AlfredApp(QMainWindow):
                                 
                             elif fc.name == "cancel_alarm":
                                 import psutil
-                                target_label = fc.args.get("label", "").lower()
-                                killed_any = False
+                                target_label = fc.args.get("label", "").lower().strip()
+                                
+                                running_alarms = []
                                 for p in psutil.process_iter(['name', 'cmdline']):
                                     try:
                                         cmd = p.info['cmdline']
                                         if cmd and 'alfred_timer.py' in ' '.join(cmd) and p.info['name'] == 'pythonw.exe':
                                             label = cmd[-1] if len(cmd) > 2 else ""
-                                            if target_label == "all" or target_label in label.lower():
-                                                p.kill()
-                                                killed_any = True
+                                            running_alarms.append((p, label))
                                     except: pass
                                 
-                                if killed_any:
-                                    response_text = f"Successfully cancelled alarm(s) matching '{target_label}'."
+                                killed_any = False
+                                if target_label == "all":
+                                    for p, label in running_alarms:
+                                        p.kill()
+                                        killed_any = True
+                                    response_text = "Successfully cancelled all alarms." if killed_any else "There were no alarms to cancel."
+                                elif target_label == "" or target_label == "alarm":
+                                    if len(running_alarms) == 1:
+                                        running_alarms[0][0].kill()
+                                        response_text = f"Successfully cancelled the alarm '{running_alarms[0][1]}'."
+                                    elif len(running_alarms) > 1:
+                                        response_text = f"You have {len(running_alarms)} alarms running. Please specify which one you want to cancel (e.g. 'cancel the pizza alarm')."
+                                    else:
+                                        response_text = "There are no active alarms."
                                 else:
-                                    response_text = f"Could not find any active alarms matching '{target_label}'."
+                                    for p, label in running_alarms:
+                                        if target_label in label.lower():
+                                            p.kill()
+                                            killed_any = True
+                                    
+                                    if killed_any:
+                                        response_text = f"Successfully cancelled alarm(s) matching '{target_label}'."
+                                    else:
+                                        response_text = f"Could not find any active alarms matching '{target_label}'."
+                                        
                                 function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"result": response_text}))
 
                             elif fc.name == "set_alarm":
