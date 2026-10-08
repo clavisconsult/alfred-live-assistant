@@ -81,12 +81,8 @@ def is_alfred_running():
 
 def launch_alfred():
     if not is_alfred_running():
-        # Mirror exactly what happens when the user double clicks the desktop icon
-        shortcut_path = os.path.join(os.environ["USERPROFILE"], "Desktop", "Alfred.lnk")
-        if os.path.exists(shortcut_path):
-            os.startfile(shortcut_path)
-        else:
-            subprocess.Popen([sys.executable.replace("python.exe", "pythonw.exe"), ALFRED_APP_PATH], cwd=os.path.dirname(__file__))
+        # Optimization: Bypass the Windows Shell/Shortcut resolver for instant kernel-level execution
+        subprocess.Popen([sys.executable.replace("python.exe", "pythonw.exe"), ALFRED_APP_PATH], cwd=os.path.dirname(__file__))
 
 def get_saved_mic_index():
     try:
