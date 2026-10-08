@@ -761,7 +761,7 @@ class AlfredApp(QMainWindow):
                                         "command prompt": "cmd", "control panel": "control", "wordpad": "write",
                                         "clock": "ms-clock:", "alarms": "ms-clock:", "steam": "steam://open/main",
                                         "discord": "Update.exe --processStart Discord.exe", "spotify": "spotify:",
-                                        "word": "winword", "excel": "excel", "powerpoint": "powerpnt",
+                                        "word": "winword", "ms word": "winword", "microsoft word": "winword", "excel": "excel", "ms excel": "excel", "powerpoint": "powerpnt", "ms powerpoint": "powerpnt",
                                         "chrome": "chrome", "google chrome": "chrome", "edge": "msedge",
                                         "microsoft edge": "msedge", "firefox": "firefox", "snipping tool": "snippingtool",
                                         "photos": "ms-photos:", "camera": "microsoft.windows.camera:",
@@ -783,7 +783,7 @@ class AlfredApp(QMainWindow):
                                     ]
                                     
                                     import traceback
-                                    bad_words = ["uninstall", "readme", "help", "setup", "install", "url", "website", "reset", "safe mode", "config"]
+                                    bad_words = ["uninstall", "readme", "help", "setup", "install", "url", "website", "reset", "safe mode", "config", "alfred"]
                                     
                                     def is_valid_lnk(fname):
                                         fl = fname.lower()
@@ -991,19 +991,21 @@ class AlfredApp(QMainWindow):
                                     url = f"https://www.youtube.com/results?search_query={urllib.parse.quote(query)}"
                                     
                                     def _yt_fetch():
-                                        # Bandwidth optimization: Gzip compression to cut HTML payload size by 75%
-                                        req = urllib.request.Request(url, headers={'Accept-Encoding': 'gzip'})
-                                        resp = urllib.request.urlopen(req)
-                                        if resp.info().get('Content-Encoding') == 'gzip':
-                                            import gzip
-                                            return gzip.decompress(resp.read()).decode('utf-8')
-                                        return resp.read().decode('utf-8')
+                                        try:
+                                            resp = self.http_session.get(url, headers={'Accept-Encoding': 'gzip', 'User-Agent': 'Mozilla/5.0'}, timeout=5)
+                                            html = resp.text
+                                            video_ids = re.findall(r"watch\?v=(\S{11})", html)
+                                            if video_ids:
+                                                final_url = f"https://www.youtube.com/watch?v={video_ids[0]}"
+                                                import webbrowser
+                                                webbrowser.open(final_url)
+                                                return final_url
+                                        except Exception as e:
+                                            pass
+                                        return None
                                         
-                                    html_decoded = await asyncio.to_thread(_yt_fetch)
-                                    video_ids = re.findall(r"watch\?v=(\S{11})", html_decoded)
-                                    if video_ids:
-                                        final_url = f"https://www.youtube.com/watch?v={video_ids[0]}"
-                                        webbrowser.open(final_url)
+                                    final_url = await asyncio.to_thread(_yt_fetch)
+                                    if final_url:
                                         function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"result": f"Now playing video at {final_url}"}))
                                     else:
                                         function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": "No videos found for that query."}))
@@ -1031,131 +1033,95 @@ class AlfredApp(QMainWindow):
                                 
 
                             elif fc.name == "read_gmail":
-                                import imaplib
-                                import email
-                                from email.header import decode_header
-                                
                                 count = fc.args.get("count", 5)
-                                gmail_user = os.environ.get("GMAIL_ADDRESS")
-                                gmail_pass = os.environ.get("GMAIL_APP_PASSWORD")
-                                
-                                if not gmail_user or not gmail_pass:
-                                    resp = "Error: Credentials missing. Tell the user exactly this: 'To read your Gmail, you need to add GMAIL_ADDRESS and GMAIL_APP_PASSWORD to your .env file. The password must be a 16-letter App Password generated from your Google Account Security settings.'"
-                                    function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": resp}))
-                                else:
+                                def _do_gmail():
+                                    import imaplib
+                                    import email
+                                    from email.header import decode_header
+                                    gmail_user = os.environ.get("GMAIL_ADDRESS")
+                                    gmail_pass = os.environ.get("GMAIL_APP_PASSWORD")
+                                    if not gmail_user or not gmail_pass:
+                                        return {"error": "Error: Credentials missing. Tell the user exactly this: 'To read your Gmail, you need to add GMAIL_ADDRESS and GMAIL_APP_PASSWORD to your .env file. The password must be a 16-letter App Password generated from your Google Account Security settings.'"}
                                     try:
                                         mail = imaplib.IMAP4_SSL("imap.gmail.com")
                                         mail.login(gmail_user, gmail_pass)
                                         mail.select("inbox")
-                                        
                                         status, messages = mail.search(None, '(UNSEEN)')
                                         if status == "OK" and messages[0]:
                                             msg_ids = messages[0].split()
                                             latest_msg_ids = msg_ids[-int(count):]
-                                            
                                             emails_data = []
                                             for msg_id in latest_msg_ids:
                                                 res, msg_data = mail.fetch(msg_id, "(RFC822)")
                                                 for response_part in msg_data:
                                                     if isinstance(response_part, tuple):
                                                         msg = email.message_from_bytes(response_part[1])
-                                                        
                                                         subject_header = decode_header(msg["Subject"])[0]
                                                         subject = subject_header[0]
-                                                        if isinstance(subject, bytes):
-                                                            subject = subject.decode(subject_header[1] if subject_header[1] else "utf-8", errors="ignore")
-                                                            
-                                                        sender_header = decode_header(msg.get("From"))[0]
-                                                        sender = sender_header[0]
-                                                        if isinstance(sender, bytes):
-                                                            sender = sender.decode(sender_header[1] if sender_header[1] else "utf-8", errors="ignore")
-                                                        
+                                                        if isinstance(subject, bytes): subject = subject.decode(subject_header[1] or 'utf-8', errors='ignore')
+                                                        sender = msg.get("From")
                                                         body = ""
                                                         if msg.is_multipart():
                                                             for part in msg.walk():
                                                                 if part.get_content_type() == "text/plain":
-                                                                    try:
-                                                                        body = part.get_payload(decode=True).decode(errors="ignore")
-                                                                        break
-                                                                    except: pass
+                                                                    body = part.get_payload(decode=True).decode(errors='ignore')
+                                                                    break
                                                         else:
-                                                            try:
-                                                                body = msg.get_payload(decode=True).decode(errors="ignore")
-                                                            except: pass
-                                                            
-                                                        emails_data.append({"From": sender, "Subject": subject, "Snippet": body[:500]})
-                                            mail.logout()
-                                            function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"emails": emails_data}))
+                                                            body = msg.get_payload(decode=True).decode(errors='ignore')
+                                                        emails_data.append({"From": sender, "Subject": subject, "BodySnippet": body[:200]})
+                                            return {"emails": emails_data}
                                         else:
                                             mail.logout()
-                                            function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"result": "You have no unread emails in Gmail."}))
+                                            return {"result": "You have no unread emails in Gmail."}
                                     except Exception as e:
-                                        function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": f"Failed to read Gmail: {str(e)}"}))
+                                        return {"error": f"Failed to read Gmail: {str(e)}"}
+                                out = await asyncio.to_thread(_do_gmail)
+                                function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response=out))
 
                             elif fc.name == "read_active_browser":
-                                import uiautomation as auto
-                                import pyautogui
-                                import pyperclip
-                                
-                                browser_win = None
-                                try:
-                                    for win in auto.GetRootControl().GetChildren():
-                                        cname = win.ClassName
-                                        if "Chrome_WidgetWin_1" in cname or "MozillaWindowClass" in cname:
-                                            if win.Name:
-                                                browser_win = win
-                                                break
-                                except:
-                                    pass
-                                
-                                if not browser_win:
-                                    function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": "No visible browser window found."}))
-                                else:
+                                def _do_browser():
+                                    import uiautomation as auto
+                                    import pyautogui
+                                    import pyperclip
+                                    browser_win = None
                                     try:
-                                        browser_win.SetFocus()
-                                    except:
-                                        pass
-                                    await asyncio.sleep(0.2)
+                                        for win in auto.GetRootControl().GetChildren():
+                                            cname = win.ClassName
+                                            if "Chrome_WidgetWin_1" in cname or "MozillaWindowClass" in cname:
+                                                if win.Name:
+                                                    browser_win = win
+                                                    break
+                                    except: pass
+                                    if not browser_win: return {"error": "No visible browser window found."}
                                     
-                                    old_clip = pyperclip.paste()
+                                    try: browser_win.SetFocus()
+                                    except: pass
+                                    time.sleep(0.2)
                                     
-                                    # 1. Try to get URL
                                     pyautogui.hotkey('ctrl', 'l')
-                                    await asyncio.sleep(0.1)
+                                    time.sleep(0.1)
                                     pyautogui.hotkey('ctrl', 'c')
-                                    await asyncio.sleep(0.1)
+                                    time.sleep(0.1)
                                     pyautogui.press('esc')
                                     url = pyperclip.paste()
                                     if not url.startswith("http"): url = "Unknown URL"
                                     
-                                    # 2. Try to get actual rendered page text via DocumentControl
-                                    doc = browser_win.DocumentControl()
-                                    if doc.Exists(0, 0):
-                                        doc.SetFocus()
-                                    else:
-                                        # Fallback click center to unfocus address bar
-                                        rect = browser_win.BoundingRectangle
-                                        if rect:
-                                            pyautogui.click((rect.left + rect.right) // 2, (rect.top + rect.bottom) // 2)
-                                            
-                                    await asyncio.sleep(0.1)
-                                    pyautogui.hotkey('ctrl', 'a')
-                                    await asyncio.sleep(0.1)
-                                    pyautogui.hotkey('ctrl', 'c')
-                                    await asyncio.sleep(0.2)
+                                    try:
+                                        doc = browser_win.DocumentControl()
+                                        page_text = doc.GetValuePattern().Value if doc.GetValuePattern() else doc.Name
+                                    except:
+                                        pyautogui.hotkey('ctrl', 'a')
+                                        time.sleep(0.1)
+                                        pyautogui.hotkey('ctrl', 'c')
+                                        time.sleep(0.1)
+                                        page_text = pyperclip.paste()
+                                        
+                                    if not page_text or len(page_text.strip()) < 10:
+                                        return {"error": "Failed to extract text from the active tab. It might be empty or protected."}
+                                    return {"url": url, "content": page_text[:40000]}
                                     
-                                    # Deselect text
-                                    pyautogui.press('esc')
-                                    pyautogui.press('up') # Un-highlight
-                                    
-                                    page_text = pyperclip.paste()
-                                    pyperclip.copy(old_clip)
-                                    
-                                    if not page_text or len(page_text) < 10:
-                                        function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": "Failed to extract text from the active tab. It might be empty or protected."}))
-                                    else:
-                                        text_content = page_text[:40000] if len(page_text) > 40000 else page_text
-                                        function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"url": url, "content": text_content}))
+                                out = await asyncio.to_thread(_do_browser)
+                                function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response=out))
                             elif fc.name == "read_webpage":
 
                                 url = fc.args.get("url", "")
