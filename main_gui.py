@@ -213,8 +213,9 @@ class AlfredApp(QMainWindow):
         import json
         with open("mic_config.json", "w") as f:
             json.dump({"mic_index": index}, f)
-        # Restart app to apply mic
-        self.close_app()
+        # Seamlessly restart the AI session without closing the UI
+        self.cancel_event.set()
+        QTimer.singleShot(1000, self.start_assistant)
 
     def run_asyncio(self):
         if sys.platform == 'win32':
