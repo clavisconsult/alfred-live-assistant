@@ -93,7 +93,6 @@ class DragOverlay(QWidget):
             menu.addAction(mute_action)
             
             mic_menu = menu.addMenu("Select Microphone")
-            import pyaudio
             temp_p = pyaudio.PyAudio()
             for i in range(temp_p.get_device_count()):
                 info = temp_p.get_device_info_by_index(i)
@@ -210,7 +209,6 @@ class AlfredApp(QMainWindow):
         self.web_view.page().runJavaScript(f"if(typeof window.setMuteState === 'function') window.setMuteState({js_bool});")
 
     def set_mic_index(self, index):
-        import json
         with open("mic_config.json", "w") as f:
             json.dump({"mic_index": index}, f)
         # Seamlessly restart the AI session without closing the UI
@@ -302,7 +300,6 @@ class AlfredApp(QMainWindow):
             with open("gui_error.log", "a") as f:
                 f.write(f"audio_input_task error: {e}\n{traceback.format_exc()}\n")
             if "Resource has been exhausted" in str(e) or "quota" in str(e).lower():
-                import subprocess
                 subprocess.Popen(["powershell", "-Command", "Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('My A. I. brain has exhausted its API quota. Please try again later.')"], creationflags=subprocess.CREATE_NO_WINDOW)
             self.cancel_event.set()
 
@@ -447,7 +444,6 @@ class AlfredApp(QMainWindow):
             with open("gui_error.log", "a") as f:
                 f.write(f"task error: {e}\n{traceback.format_exc()}\n")
             if "Resource has been exhausted" in str(e) or "quota" in str(e).lower():
-                import subprocess
                 subprocess.Popen(["powershell", "-Command", "Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('My A. I. brain has exhausted its API quota. Please try again later.')"], creationflags=subprocess.CREATE_NO_WINDOW)
             self.cancel_event.set()
 
@@ -533,7 +529,6 @@ class AlfredApp(QMainWindow):
         stream_out = None
         
         try:
-            import json
             with open("mic_config.json", "r") as f:
                 mic_index = json.load(f).get("mic_index", None)
         except:
@@ -563,7 +558,6 @@ class AlfredApp(QMainWindow):
         self.mic_thread = threading.Thread(target=self._mic_worker, args=(stream_in, loop, mic_queue), daemon=True)
         self.mic_thread.start()
         
-        import os
         key = os.environ.get("GEMINI_API_KEY", "NOT_FOUND")
         with open("gui_error.log", "a") as f:
             f.write(f"\n--- NEW RUN ---\nAPI KEY START: {key[:5]}...{key[-5:]}\n")
