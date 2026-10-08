@@ -712,6 +712,13 @@ class AlfredApp(QMainWindow):
 
                                 
 
+                            elif fc.name == "close_application":
+                                app_name = fc.args.get("app_name", "").replace("'", "")
+                                cmd = f"Get-Process | Where-Object {{ .ProcessName -match '{app_name}' -or .MainWindowTitle -match '{app_name}' }} | Stop-Process -Force -ErrorAction SilentlyContinue"
+                                subprocess.Popen(["powershell", "-WindowStyle", "Hidden", "-Command", cmd], creationflags=subprocess.CREATE_NO_WINDOW)
+                                function_responses.append(types.FunctionResponse(
+                                    id=fc.id, name=fc.name, response={"result": f"Sent command to close {app_name}."}
+                                ))
                             elif fc.name == "open_application":
 
                                 app_name = fc.args.get("app_name", "")
@@ -844,6 +851,58 @@ class AlfredApp(QMainWindow):
 
                                 
 
+                            elif fc.name == "read_active_browser":
+                                import uiautomation as auto
+                                import pyautogui
+                                import pyperclip
+                                import requests
+                                from bs4 import BeautifulSoup
+                                
+                                browser_win = None
+                                try:
+                                    for win in auto.GetRootControl().GetChildren():
+                                        cname = win.ClassName
+                                        if "Chrome_WidgetWin_1" in cname or "MozillaWindowClass" in cname:
+                                            if win.Name:
+                                                browser_win = win
+                                                break
+                                except:
+                                    pass
+                                
+                                if not browser_win:
+                                    function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": "No visible browser window found."}))
+                                else:
+                                    try:
+                                        browser_win.SetFocus()
+                                    except:
+                                        pass
+                                    await asyncio.sleep(0.3)
+                                    
+                                    old_clip = pyperclip.paste()
+                                    pyautogui.hotkey('ctrl', 'l')
+                                    await asyncio.sleep(0.1)
+                                    pyautogui.hotkey('ctrl', 'c')
+                                    await asyncio.sleep(0.1)
+                                    pyautogui.press('esc')
+                                    
+                                    url = pyperclip.paste()
+                                    pyperclip.copy(old_clip)
+                                    
+                                    if not url or ("http" not in url and "." not in url):
+                                        function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": "Could not extract URL from the active browser."}))
+                                    else:
+                                        if not url.startswith("http"):
+                                            url = "https://" + url
+                                        
+                                        try:
+                                            resp = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
+                                            soup = BeautifulSoup(resp.content, 'html.parser')
+                                            text_content = ' '.join(soup.stripped_strings)
+                                            if len(text_content) > 30000:
+                                                text_content = text_content[:30000] + "... (truncated)"
+                                            function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"content": text_content}))
+                                        except Exception as e:
+                                            function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": f"Failed to fetch content from {url}: {str(e)}"}))
                             elif fc.name == "read_webpage":
 
                                 url = fc.args.get("url", "")
@@ -980,6 +1039,25 @@ class AlfredApp(QMainWindow):
 
         
 
+        close_application_tool = {
+            "name": "close_application",
+            "description": "Closes a Windows application by name (e.g. 'chrome', 'spotify', 'notepad'). Use this whenever the user asks to close, exit, or kill an app.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {"app_name": {"type": "STRING"}},
+                "required": ["app_name"]
+            }
+        }
+        
+        read_active_browser_tool = {
+            "name": "read_active_browser",
+            "description": "Reads the text of the webpage currently open in the user's active browser. Use this when the user asks you to read or summarize the page they are currently looking at.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {}
+            }
+        }
+
         open_browser_url_tool = {
 
             "name": "open_browser_url",
@@ -1040,7 +1118,7 @@ class AlfredApp(QMainWindow):
 
             ),
 
-            tools=[{"function_declarations": [execute_command_tool, open_application_tool, open_browser_url_tool, read_webpage_tool, close_assistant_tool]}],
+            tools=[{"function_declarations": [execute_command_tool, open_application_tool, close_application_tool, open_browser_url_tool, read_webpage_tool, read_active_browser_tool, close_assistant_tool]}],
 
             input_audio_transcription=types.AudioTranscriptionConfig(mode="smart"),
 
