@@ -116,14 +116,14 @@ def listen_loop():
             if stream is None:
                 idx = get_saved_mic_index()
                 try:
-                    stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=4000, input_device_index=idx)
+                    stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=2000, input_device_index=idx)
                     stream.start_stream()
                 except Exception as e:
                     # Fallback to default
-                    stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=4000)
+                    stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=2000)
                     stream.start_stream()
                 
-            data = stream.read(4000, exception_on_overflow=False)
+            data = stream.read(2000, exception_on_overflow=False)
             
             if recognizer.AcceptWaveform(data):
                 res = json.loads(recognizer.Result())
