@@ -186,6 +186,12 @@ def listen_loop():
 
 if __name__ == "__main__":
     try:
+        import psutil
+        import os
+        psutil.Process(os.getpid()).nice(psutil.HIGH_PRIORITY_CLASS)
+    except:
+        pass
+    try:
         listen_loop()
     except Exception as e:
         with open("fatal_crash.log", "a") as f:
