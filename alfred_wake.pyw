@@ -146,7 +146,6 @@ def listen_loop():
                     else:
                         valid_wake = True
                 if valid_wake:
-                if valid_wake:
                     if stream is not None:
                         stream.stop_stream()
                         stream.close()
