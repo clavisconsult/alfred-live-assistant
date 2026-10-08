@@ -61,37 +61,14 @@ recognizer = vosk.KaldiRecognizer(model, 16000, grammar)
 
 
 
-cached_pid = None
-last_check_time = 0
-is_running_cache = False
+import ctypes
 
 def is_alfred_running():
-    global cached_pid, last_check_time, is_running_cache
-    
-    # Fast path: if we know the PID, just check if it's alive (O(1))
-    if cached_pid is not None:
-        if psutil.pid_exists(cached_pid):
-            return True
-        else:
-            cached_pid = None
-            
-    # Throttle full system process iteration to once every 2 seconds
-    if time.time() - last_check_time < 2.0:
-        return is_running_cache
-        
-    last_check_time = time.time()
-    
-    for proc in psutil.process_iter(['name', 'cmdline']):
-        try:
-            if proc.info['name'] in ['python.exe', 'pythonw.exe']:
-                if proc.info['cmdline'] and any('main_gui.py' in cmd for cmd in proc.info['cmdline']):
-                    cached_pid = proc.pid
-                    is_running_cache = True
-                    return True
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-            pass
-            
-    is_running_cache = False
+    kernel32 = ctypes.windll.kernel32
+    mutex = kernel32.OpenMutexW(0x00100000, False, "AlfredAssistantRunningMutex")
+    if mutex:
+        kernel32.CloseHandle(mutex)
+        return True
     return False
 
 def launch_alfred():
