@@ -257,6 +257,10 @@ class AlfredApp(QMainWindow):
 
                     fft_bins = get_fft_bins(data, 32)
                     self.signals.fft_data.emit(fft_bins)
+                    
+                    with open("gui_error.log", "a") as debugf:
+                        debugf.write("PLAYING AUDIO CHUNK: " + str(len(data)) + "\n")
+                        
                     stream_out.write(data)
             except queue.Empty:
                 empty_ticks += 1
@@ -282,7 +286,7 @@ class AlfredApp(QMainWindow):
                         rms = np.sqrt(np.mean(np.square(audio_array.astype(np.float32))))
                         # If the sound is quiet/moderate (speaker bleed), mute it.
                         # If the user speaks loudly (RMS > 2500), let the chunk through so Gemini hears the interruption!
-                        if rms < 2500:
+                        if rms < 300: # Lowered threshold to ensure user is heard
                             data = b'\x00' * len(data)
                     loop.call_soon_threadsafe(mic_queue.put_nowait, data)
             except Exception as e:
@@ -439,7 +443,7 @@ class AlfredApp(QMainWindow):
                                 function_responses.append(types.FunctionResponse(
                                     id=fc.id, 
                                     name=fc.name, 
-                                    response={"result": "Success. You may now say your final goodbye."}
+                                    response={"result": "Success. The system will close in 3 seconds. You MUST say a short goodbye to the user NOW."}
                                 ))
 
                         await session.send_tool_response(function_responses=function_responses)
