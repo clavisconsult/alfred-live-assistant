@@ -831,6 +831,36 @@ class AlfredApp(QMainWindow):
 
                                 
 
+                            elif fc.name == "set_system_volume":
+                                try:
+                                    from pycaw.pycaw import AudioUtilities
+                                    level = int(fc.args.get("level_percent", 50))
+                                    level = max(0, min(100, level))
+                                    devices = AudioUtilities.GetSpeakers()
+                                    devices.EndpointVolume.SetMasterVolumeLevelScalar(level / 100.0, None)
+                                    function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"result": f"System volume set to {level}%"}))
+                                except Exception as e:
+                                    function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": str(e)}))
+                                    
+                            elif fc.name == "play_youtube_video":
+                                import urllib.request
+                                import urllib.parse
+                                import re
+                                import webbrowser
+                                try:
+                                    query = fc.args.get("query", "")
+                                    url = f"https://www.youtube.com/results?search_query={urllib.parse.quote(query)}"
+                                    html = urllib.request.urlopen(url)
+                                    video_ids = re.findall(r"watch\?v=(\S{11})", html.read().decode())
+                                    if video_ids:
+                                        final_url = f"https://www.youtube.com/watch?v={video_ids[0]}"
+                                        webbrowser.open(final_url)
+                                        function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"result": f"Now playing video at {final_url}"}))
+                                    else:
+                                        function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": "No videos found for that query."}))
+                                except Exception as e:
+                                    function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": str(e)}))
+
                             elif fc.name == "open_browser_url":
 
                                 url = fc.args.get("url", "")
@@ -1144,6 +1174,26 @@ class AlfredApp(QMainWindow):
             }
         }
 
+        set_system_volume_tool = {
+            "name": "set_system_volume",
+            "description": "Sets the Windows system master volume to a specific percentage (0 to 100). Use this whenever the user asks to change the volume.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {"level_percent": {"type": "INTEGER", "description": "Volume level from 0 to 100"}},
+                "required": ["level_percent"]
+            }
+        }
+        
+        play_youtube_video_tool = {
+            "name": "play_youtube_video",
+            "description": "Searches YouTube for a query and automatically opens and plays the first video result. Use this when the user asks you to play a specific video or song.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {"query": {"type": "STRING", "description": "The search query for the video (e.g., 'OPM music')"}},
+                "required": ["query"]
+            }
+        }
+
         open_browser_url_tool = {
 
             "name": "open_browser_url",
@@ -1200,11 +1250,11 @@ class AlfredApp(QMainWindow):
 
             system_instruction=types.Content(
 
-                parts=[types.Part(text="You are Alfred, a loyal, polite, and slightly comedic elderly butler. Speak in a very formal, distinguished, deep, and consistent elderly tone, but sprinkle in a bit of dry, subtle humor and polite sass. Do not attempt regional accents that might cause your voice to glitch. Always address the user politely as 'Sir'. For application opening requests, ALWAYS use the open_application tool. For web tasks, use open_browser_url. For reading websites, use read_webpage. For general PC tasks, use execute_command. If the user asks you to take a break, leave, close, quit, or exit, YOU MUST use the close_assistant tool. Wait for the tool to return success, THEN say a short goodbye. If the user asks to read their latest emails, use the read_gmail tool. CRITICAL RULES: 1. Keep your replies extremely concise and brief. 2. NEVER speak more than 1 or 2 short sentences per turn. 3. DO NOT exceed 15-20 words in your response unless you are actively explaining a complex topic the user specifically asked for. Speak fast, be highly direct, and avoid rambling.")]
+                parts=[types.Part(text="You are Alfred, a loyal, polite, and slightly comedic elderly butler. Speak in a very formal, distinguished, deep, and consistent elderly tone, but sprinkle in a bit of dry, subtle humor and polite sass. Do not attempt regional accents that might cause your voice to glitch. Always address the user politely as 'Sir'. For application opening requests, ALWAYS use the open_application tool. For web tasks, use open_browser_url. For reading websites, use read_webpage. For general PC tasks, use execute_command. If the user asks you to take a break, leave, close, quit, or exit, YOU MUST use the close_assistant tool. Wait for the tool to return success, THEN say a short goodbye. If the user asks to read their latest emails, use the read_gmail tool. If the user asks to play a video or song, ALWAYS use play_youtube_video. If they ask to adjust volume, use set_system_volume. CRITICAL RULES: 1. Keep your replies extremely concise and brief. 2. NEVER speak more than 1 or 2 short sentences per turn. 3. DO NOT exceed 15-20 words in your response unless you are actively explaining a complex topic the user specifically asked for. Speak fast, be highly direct, and avoid rambling.")]
 
             ),
 
-            tools=[{"function_declarations": [execute_command_tool, open_application_tool, close_application_tool, open_browser_url_tool, read_webpage_tool, read_active_browser_tool, read_gmail_tool, close_assistant_tool]}],
+            tools=[{"function_declarations": [execute_command_tool, open_application_tool, close_application_tool, open_browser_url_tool, read_webpage_tool, read_active_browser_tool, read_gmail_tool, set_system_volume_tool, play_youtube_video_tool, close_assistant_tool]}],
 
             input_audio_transcription=types.AudioTranscriptionConfig(mode="smart"),
 
