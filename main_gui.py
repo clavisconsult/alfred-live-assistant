@@ -851,6 +851,68 @@ class AlfredApp(QMainWindow):
 
                                 
 
+                            elif fc.name == "read_gmail":
+                                import imaplib
+                                import email
+                                from email.header import decode_header
+                                
+                                count = fc.args.get("count", 5)
+                                gmail_user = os.environ.get("GMAIL_ADDRESS")
+                                gmail_pass = os.environ.get("GMAIL_APP_PASSWORD")
+                                
+                                if not gmail_user or not gmail_pass:
+                                    resp = "Error: Credentials missing. Tell the user exactly this: 'To read your Gmail, you need to add GMAIL_ADDRESS and GMAIL_APP_PASSWORD to your .env file. The password must be a 16-letter App Password generated from your Google Account Security settings.'"
+                                    function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": resp}))
+                                else:
+                                    try:
+                                        mail = imaplib.IMAP4_SSL("imap.gmail.com")
+                                        mail.login(gmail_user, gmail_pass)
+                                        mail.select("inbox")
+                                        
+                                        status, messages = mail.search(None, '(UNSEEN)')
+                                        if status == "OK" and messages[0]:
+                                            msg_ids = messages[0].split()
+                                            latest_msg_ids = msg_ids[-int(count):]
+                                            
+                                            emails_data = []
+                                            for msg_id in latest_msg_ids:
+                                                res, msg_data = mail.fetch(msg_id, "(RFC822)")
+                                                for response_part in msg_data:
+                                                    if isinstance(response_part, tuple):
+                                                        msg = email.message_from_bytes(response_part[1])
+                                                        
+                                                        subject_header = decode_header(msg["Subject"])[0]
+                                                        subject = subject_header[0]
+                                                        if isinstance(subject, bytes):
+                                                            subject = subject.decode(subject_header[1] if subject_header[1] else "utf-8", errors="ignore")
+                                                            
+                                                        sender_header = decode_header(msg.get("From"))[0]
+                                                        sender = sender_header[0]
+                                                        if isinstance(sender, bytes):
+                                                            sender = sender.decode(sender_header[1] if sender_header[1] else "utf-8", errors="ignore")
+                                                        
+                                                        body = ""
+                                                        if msg.is_multipart():
+                                                            for part in msg.walk():
+                                                                if part.get_content_type() == "text/plain":
+                                                                    try:
+                                                                        body = part.get_payload(decode=True).decode(errors="ignore")
+                                                                        break
+                                                                    except: pass
+                                                        else:
+                                                            try:
+                                                                body = msg.get_payload(decode=True).decode(errors="ignore")
+                                                            except: pass
+                                                            
+                                                        emails_data.append({"From": sender, "Subject": subject, "Snippet": body[:500]})
+                                            mail.logout()
+                                            function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"emails": emails_data}))
+                                        else:
+                                            mail.logout()
+                                            function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"result": "You have no unread emails in Gmail."}))
+                                    except Exception as e:
+                                        function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": f"Failed to read Gmail: {str(e)}"}))
+
                             elif fc.name == "read_active_browser":
                                 import uiautomation as auto
                                 import pyautogui
@@ -1063,13 +1125,24 @@ class AlfredApp(QMainWindow):
         
         read_active_browser_tool = {
             "name": "read_active_browser",
-            "description": "Reads the text of the webpage currently open in the user's active browser. Use this when the user asks you to read or summarize the page they are currently looking at, OR when they ask you to 'read my emails' (assume they have their email open in the browser).",
+            "description": "Reads the text of the webpage currently open in the user's active browser. Use this when the user asks you to read or summarize the page they are currently looking at.",
             "parameters": {
                 "type": "OBJECT",
                 "properties": {}
             }
         }
 
+
+        read_gmail_tool = {
+            "name": "read_gmail",
+            "description": "Reads the user's latest unread emails from Gmail. Use this when they ask you to check their Gmail or read their latest emails.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "count": {"type": "INTEGER", "description": "Number of emails to read (default 5)"}
+                }
+            }
+        }
 
         open_browser_url_tool = {
 
@@ -1127,11 +1200,11 @@ class AlfredApp(QMainWindow):
 
             system_instruction=types.Content(
 
-                parts=[types.Part(text="You are Alfred, a loyal, polite, and slightly comedic elderly butler. Speak in a very formal, distinguished, deep, and consistent elderly tone, but sprinkle in a bit of dry, subtle humor and polite sass. Do not attempt regional accents that might cause your voice to glitch. Always address the user politely as 'Sir'. For application opening requests, ALWAYS use the open_application tool. For web tasks, use open_browser_url. For reading websites, use read_webpage. For general PC tasks, use execute_command. If the user asks you to take a break, leave, close, quit, or exit, YOU MUST use the close_assistant tool. Wait for the tool to return success, THEN say a short goodbye. If the user asks you to 'read the latest emails' or similar, assume their email is open on their screen and ALWAYS use the read_active_browser tool to read it for them. CRITICAL RULES: 1. Keep your replies extremely concise and brief. 2. NEVER speak more than 1 or 2 short sentences per turn. 3. DO NOT exceed 15-20 words in your response unless you are actively explaining a complex topic the user specifically asked for. Speak fast, be highly direct, and avoid rambling.")]
+                parts=[types.Part(text="You are Alfred, a loyal, polite, and slightly comedic elderly butler. Speak in a very formal, distinguished, deep, and consistent elderly tone, but sprinkle in a bit of dry, subtle humor and polite sass. Do not attempt regional accents that might cause your voice to glitch. Always address the user politely as 'Sir'. For application opening requests, ALWAYS use the open_application tool. For web tasks, use open_browser_url. For reading websites, use read_webpage. For general PC tasks, use execute_command. If the user asks you to take a break, leave, close, quit, or exit, YOU MUST use the close_assistant tool. Wait for the tool to return success, THEN say a short goodbye. If the user asks to read their latest emails, use the read_gmail tool. CRITICAL RULES: 1. Keep your replies extremely concise and brief. 2. NEVER speak more than 1 or 2 short sentences per turn. 3. DO NOT exceed 15-20 words in your response unless you are actively explaining a complex topic the user specifically asked for. Speak fast, be highly direct, and avoid rambling.")]
 
             ),
 
-            tools=[{"function_declarations": [execute_command_tool, open_application_tool, close_application_tool, open_browser_url_tool, read_webpage_tool, read_active_browser_tool, close_assistant_tool]}],
+            tools=[{"function_declarations": [execute_command_tool, open_application_tool, close_application_tool, open_browser_url_tool, read_webpage_tool, read_active_browser_tool, read_gmail_tool, close_assistant_tool]}],
 
             input_audio_transcription=types.AudioTranscriptionConfig(mode="smart"),
 
