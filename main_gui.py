@@ -254,6 +254,8 @@ class AlfredApp(QMainWindow):
             except queue.Empty:
                 empty_ticks += 1
                 self.signals.fft_data.emit([0.0] * 32)
+                self.alfred_is_speaking = False
+                self.speaker_cooldown = 0
                 if getattr(self, 'pending_exit', False) and empty_ticks > 20:
                     # 1 second of network silence confirms the goodbye audio has fully played out
                     with open("debug.log", "a") as f:
@@ -540,8 +542,12 @@ class AlfredApp(QMainWindow):
             stream_in = p.open(format=FORMAT, channels=CHANNELS, rate=INPUT_RATE, input=True, frames_per_buffer=CHUNK, input_device_index=mic_index)
             stream_out = p.open(format=FORMAT, channels=CHANNELS, rate=OUTPUT_RATE, output=True, frames_per_buffer=CHUNK)
         except Exception as e:
-            try:
-                # Fallback to default mic if specific one fails
+
+                    with open("gui_error.log", "a") as f: f.write(f"Mic index {mic_index} failed to open: {e}
+")
+
+                    try:
+            # Fallback to default mic if specific one fails
                 stream_in = p.open(format=FORMAT, channels=CHANNELS, rate=INPUT_RATE, input=True, frames_per_buffer=CHUNK)
                 stream_out = p.open(format=FORMAT, channels=CHANNELS, rate=OUTPUT_RATE, output=True, frames_per_buffer=CHUNK)
             except Exception as e2:
