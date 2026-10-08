@@ -1185,9 +1185,11 @@ class AlfredApp(QMainWindow):
                                 
 
                             elif fc.name == "update_memory":
-                                topic = fc.args.get("topic")
-                                details = fc.args.get("details")
-                                memory_manager.remember(topic, details)
+                                topic = fc.args.get("topic", "General Note")
+                                details = fc.args.get("details", "")
+                                if not topic: topic = "General Note"
+                                if not details: details = "Empty memory."
+                                memory_manager.remember(str(topic), str(details))
                                 function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"result": f"Successfully committed to permanent memory under topic: {topic}"}))
                             elif fc.name == "change_voice":
                                 voice_name = fc.args.get("voice_name", "Charon").capitalize()
