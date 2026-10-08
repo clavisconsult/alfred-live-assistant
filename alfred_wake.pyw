@@ -16,7 +16,6 @@ app.setQuitOnLastWindowClosed(False)
 tray_icon = QSystemTrayIcon(QIcon(os.path.join(os.path.dirname(__file__), "alfred.ico")), app)
 tray_menu = QMenu()
 
-import json
 def set_mic_index(index):
     with open("mic_config.json", "w") as f:
         json.dump({"mic_index": index}, f)
@@ -44,9 +43,6 @@ tray_icon.setContextMenu(tray_menu)
 tray_icon.setToolTip("Alfred is listening...")
 tray_icon.show()
 
-import psutil
-import vosk
-import pyaudio
 
 MODEL_DIR = os.path.join(os.path.dirname(__file__), "vosk_model")
 ALFRED_APP_PATH = os.path.join(os.path.dirname(__file__), "main_gui.py")
