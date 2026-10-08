@@ -36,8 +36,12 @@ for i in range(temp_p.get_device_count()):
         mic_menu.addAction(action)
 temp_p.terminate()
 
+def clean_quit():
+    tray_icon.hide()
+    sys.exit(0)
+
 quit_action = QAction("Quit Alfred Background Engine")
-quit_action.triggered.connect(lambda: sys.exit(0))
+quit_action.triggered.connect(clean_quit)
 tray_menu.addAction(quit_action)
 tray_icon.setContextMenu(tray_menu)
 tray_icon.setToolTip("Alfred is listening...")
