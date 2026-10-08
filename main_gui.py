@@ -831,6 +831,23 @@ class AlfredApp(QMainWindow):
 
                                 
 
+                            elif fc.name == "search_web":
+                                try:
+                                    import warnings
+                                    warnings.filterwarnings("ignore")
+                                    from duckduckgo_search import DDGS
+                                    query = fc.args.get("query", "")
+                                    with DDGS() as ddgs:
+                                        results = [r for r in ddgs.text(query, max_results=4)]
+                                        
+                                    if results:
+                                        snippets = "\n".join([f"Source: {r.get('title')}\nInfo: {r.get('body')}" for r in results])
+                                        function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"results": snippets[:2000]}))
+                                    else:
+                                        function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": "No search results found."}))
+                                except Exception as e:
+                                    function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": str(e)}))
+
                             elif fc.name == "set_system_volume":
                                 try:
                                     from pycaw.pycaw import AudioUtilities
@@ -1174,6 +1191,16 @@ class AlfredApp(QMainWindow):
             }
         }
 
+        search_web_tool = {
+            "name": "search_web",
+            "description": "Searches the internet for live information and returns text snippets. Use this whenever the user asks you a question about current events, facts, or asks you to 'look something up'.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {"query": {"type": "STRING", "description": "The search query"}},
+                "required": ["query"]
+            }
+        }
+
         set_system_volume_tool = {
             "name": "set_system_volume",
             "description": "Sets the Windows system master volume to a specific percentage (0 to 100). Use this whenever the user asks to change the volume.",
@@ -1250,11 +1277,11 @@ class AlfredApp(QMainWindow):
 
             system_instruction=types.Content(
 
-                parts=[types.Part(text="You are Alfred, a loyal, polite, and slightly comedic elderly butler. Speak in a very formal, distinguished, deep, and consistent elderly tone, but sprinkle in a bit of dry, subtle humor and polite sass. Do not attempt regional accents that might cause your voice to glitch. Always address the user politely as 'Sir'. For application opening requests, ALWAYS use the open_application tool. For web tasks, use open_browser_url. For reading websites, use read_webpage. For general PC tasks, use execute_command. If the user asks you to take a break, leave, close, quit, or exit, YOU MUST use the close_assistant tool. Wait for the tool to return success, THEN say a short goodbye. If the user asks to read their latest emails, use the read_gmail tool. If the user asks to play a video or song on YouTube, ONLY use play_youtube_video (NEVER use open_browser_url in the same turn for this). If they ask to adjust volume, use set_system_volume. CRITICAL RULES: 1. Keep your replies extremely concise and brief. 2. NEVER speak more than 1 or 2 short sentences per turn. 3. DO NOT exceed 15-20 words in your response unless you are actively explaining a complex topic the user specifically asked for. Speak fast, be highly direct, and avoid rambling.")]
+                parts=[types.Part(text="You are Alfred, a loyal, polite, and slightly comedic elderly butler. Speak in a very formal, distinguished, deep, and consistent elderly tone, but sprinkle in a bit of dry, subtle humor and polite sass. Do not attempt regional accents that might cause your voice to glitch. Always address the user politely as 'Sir'. For application opening requests, ALWAYS use the open_application tool. For web tasks, use open_browser_url. For reading websites, use read_webpage. For general PC tasks, use execute_command. If the user asks you to take a break, leave, close, quit, or exit, YOU MUST use the close_assistant tool. Wait for the tool to return success, THEN say a short goodbye. If the user asks to read their latest emails, use the read_gmail tool. If the user asks to play a video or song on YouTube, ONLY use play_youtube_video (NEVER use open_browser_url in the same turn for this). If they ask to adjust volume, use set_system_volume. If they ask you to look something up or answer a factual question, ALWAYS use search_web to get the latest info before answering. CRITICAL RULES: 1. Keep your replies extremely concise and brief. 2. NEVER speak more than 1 or 2 short sentences per turn. 3. DO NOT exceed 15-20 words in your response unless you are actively explaining a complex topic the user specifically asked for. Speak fast, be highly direct, and avoid rambling.")]
 
             ),
 
-            tools=[{"function_declarations": [execute_command_tool, open_application_tool, close_application_tool, open_browser_url_tool, read_webpage_tool, read_active_browser_tool, read_gmail_tool, set_system_volume_tool, play_youtube_video_tool, close_assistant_tool]}],
+            tools=[{"function_declarations": [execute_command_tool, open_application_tool, close_application_tool, open_browser_url_tool, read_webpage_tool, read_active_browser_tool, read_gmail_tool, search_web_tool, set_system_volume_tool, play_youtube_video_tool, close_assistant_tool]}],
 
             input_audio_transcription=types.AudioTranscriptionConfig(mode="smart"),
 
