@@ -139,9 +139,9 @@ class AlfredApp(QMainWindow):
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
-        # Force window to spawn at the center of the primary screen
-        screen = QApplication.primaryScreen().geometry()
-        self.move((screen.width() - 350) // 2, (screen.height() - 350) // 2)
+        # Optimization: Spawn widget in the bottom-right corner (above taskbar)
+        screen = QApplication.primaryScreen().availableGeometry()
+        self.move(screen.width() - 350 - 20, screen.height() - 350 - 20)
 
         central_widget = QWidget(self)
         central_widget.setStyleSheet("background: transparent;")
