@@ -455,6 +455,7 @@ class AlfredApp(QMainWindow):
     async def main_async(self, loop):
         try:
             from google import genai
+            from google.genai import types
             client = genai.Client()
         except Exception as e:
             with open("gui_error.log", "a") as f:
