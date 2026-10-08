@@ -914,6 +914,10 @@ class AlfredApp(QMainWindow):
                                 import requests
                                 import json
                                 import asyncio
+                                
+                                # Global SSL Connection Pool optimization
+                                if not hasattr(self, 'http_session'):
+                                    self.http_session = requests.Session()
                                 try:
                                     query = fc.args.get("query", "")
                                     
@@ -944,7 +948,7 @@ class AlfredApp(QMainWindow):
                                             ],
                                             "max_tokens": 150
                                         }
-                                        resp = requests.post(url, headers=headers, json=payload, timeout=10)
+                                        resp = self.http_session.post(url, headers=headers, json=payload, timeout=10)
                                         if resp.status_code == 200:
                                             return {"results": resp.json()['choices'][0]['message']['content']}
                                         return {"error": f"Groq API Error {resp.status_code}: {resp.text[:500]}"}
