@@ -76,7 +76,12 @@ class AlfredTimer(QWidget):
             self.lbl_time.setStyleSheet("color: #FF3366; font-size: 32px; font-weight: bold; font-family: Segoe UI;")
             self.btn_dismiss.show()
             self.resize(250, 140)
-            winsound.PlaySound("SystemAsterisk", winsound.SND_ALIAS | winsound.SND_LOOP | winsound.SND_ASYNC)
+            import os
+            wav_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "alarm.wav")
+            if os.path.exists(wav_path):
+                winsound.PlaySound(wav_path, winsound.SND_FILENAME | winsound.SND_LOOP | winsound.SND_ASYNC)
+            else:
+                winsound.PlaySound("SystemAsterisk", winsound.SND_ALIAS | winsound.SND_LOOP | winsound.SND_ASYNC)
 
     def close_alarm(self):
         winsound.PlaySound(None, winsound.SND_PURGE)
