@@ -916,8 +916,6 @@ class AlfredApp(QMainWindow):
                                 import uiautomation as auto
                                 import pyautogui
                                 import pyperclip
-                                import requests
-                                from bs4 import BeautifulSoup
                                 
                                 browser_win = None
                                 try:
@@ -937,33 +935,47 @@ class AlfredApp(QMainWindow):
                                         browser_win.SetFocus()
                                     except:
                                         pass
-                                    await asyncio.sleep(0.3)
+                                    await asyncio.sleep(0.2)
                                     
                                     old_clip = pyperclip.paste()
+                                    
+                                    # 1. Try to get URL
                                     pyautogui.hotkey('ctrl', 'l')
                                     await asyncio.sleep(0.1)
                                     pyautogui.hotkey('ctrl', 'c')
                                     await asyncio.sleep(0.1)
                                     pyautogui.press('esc')
-                                    
                                     url = pyperclip.paste()
+                                    if not url.startswith("http"): url = "Unknown URL"
+                                    
+                                    # 2. Try to get actual rendered page text via DocumentControl
+                                    doc = browser_win.DocumentControl()
+                                    if doc.Exists(0, 0):
+                                        doc.SetFocus()
+                                    else:
+                                        # Fallback click center to unfocus address bar
+                                        rect = browser_win.BoundingRectangle
+                                        if rect:
+                                            pyautogui.click((rect.left + rect.right) // 2, (rect.top + rect.bottom) // 2)
+                                            
+                                    await asyncio.sleep(0.1)
+                                    pyautogui.hotkey('ctrl', 'a')
+                                    await asyncio.sleep(0.1)
+                                    pyautogui.hotkey('ctrl', 'c')
+                                    await asyncio.sleep(0.2)
+                                    
+                                    # Deselect text
+                                    pyautogui.press('esc')
+                                    pyautogui.press('up') # Un-highlight
+                                    
+                                    page_text = pyperclip.paste()
                                     pyperclip.copy(old_clip)
                                     
-                                    if not url or ("http" not in url and "." not in url):
-                                        function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": "Could not extract URL from the active browser."}))
+                                    if not page_text or len(page_text) < 10:
+                                        function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": "Failed to extract text from the active tab. It might be empty or protected."}))
                                     else:
-                                        if not url.startswith("http"):
-                                            url = "https://" + url
-                                        
-                                        try:
-                                            resp = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
-                                            soup = BeautifulSoup(resp.content, 'html.parser')
-                                            text_content = ' '.join(soup.stripped_strings)
-                                            if len(text_content) > 30000:
-                                                text_content = text_content[:30000] + "... (truncated)"
-                                            function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"content": text_content}))
-                                        except Exception as e:
-                                            function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": f"Failed to fetch content from {url}: {str(e)}"}))
+                                        text_content = page_text[:40000] if len(page_text) > 40000 else page_text
+                                        function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"url": url, "content": text_content}))
                             elif fc.name == "read_webpage":
 
                                 url = fc.args.get("url", "")
