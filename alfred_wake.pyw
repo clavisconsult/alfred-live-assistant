@@ -58,6 +58,7 @@ except Exception as e:
 
 grammar = '["alfred", "hey alfred", "wake up alfred", "hello alfred", "[unk]"]'
 recognizer = vosk.KaldiRecognizer(model, 16000, grammar)
+recognizer.SetWords(True)
 
 
 
@@ -129,7 +130,21 @@ def listen_loop():
                     with open("wake_debug.log", "a") as f:
                         f.write(f"Vosk heard: {text}\n")
                         
+                valid_wake = False
                 if "alfred" in text.lower():
+                    if "result" in res:
+                        for word_data in res["result"]:
+                            if "alfred" in word_data.get("word", "").lower():
+                                conf = word_data.get("conf", 1.0)
+                                if conf >= 0.70:
+                                    valid_wake = True
+                                else:
+                                    with open("wake_debug.log", "a") as f:
+                                        f.write(f"Rejected alfred due to low confidence: {conf}\n")
+                    else:
+                        valid_wake = True
+                        
+                if valid_wake:
                     if stream is not None:
                         stream.stop_stream()
                         stream.close()
