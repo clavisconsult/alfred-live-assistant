@@ -136,14 +136,19 @@ def listen_loop():
                         for word_data in res["result"]:
                             if "alfred" in word_data.get("word", "").lower():
                                 conf = word_data.get("conf", 1.0)
-                                if conf >= 0.70:
+                                if conf >= 0.88:
                                     valid_wake = True
+                                    with open("wake_debug.log", "a") as f:
+                                        f.write(f"ACCEPTED alfred with confidence: {conf}
+")
                                 else:
                                     with open("wake_debug.log", "a") as f:
-                                        f.write(f"Rejected alfred due to low confidence: {conf}\n")
+                                        f.write(f"Rejected alfred due to low confidence: {conf}
+")
                     else:
                         valid_wake = True
                         
+                if valid_wake:
                 if valid_wake:
                     if stream is not None:
                         stream.stop_stream()
