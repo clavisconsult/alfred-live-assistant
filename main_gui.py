@@ -1172,6 +1172,19 @@ class AlfredApp(QMainWindow):
 
                                 
 
+                            elif fc.name == "change_voice":
+                                voice_name = fc.args.get("voice_name", "Charon").capitalize()
+                                valid_voices = ["Aoede", "Charon", "Fenrir", "Kore", "Puck"]
+                                if voice_name in valid_voices:
+                                    try:
+                                        with open("alfred_config.json", "w") as f:
+                                            import json
+                                            json.dump({"voice": voice_name}, f)
+                                        function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"result": f"Voice updated to {voice_name}. Tell the user you are going to reboot your vocal processors to apply the change, then immediately call the close_assistant tool so you can restart."}))
+                                    except Exception as e:
+                                        function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": str(e)}))
+                                else:
+                                    function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": f"Invalid voice. Choose from: {', '.join(valid_voices)}"}))
                             elif fc.name == "close_assistant":
 
                                 self.exit_requested = True
@@ -1434,6 +1447,18 @@ class AlfredApp(QMainWindow):
 
         
 
+        change_voice_tool = {
+            "name": "change_voice",
+            "description": "Changes your speaking voice. Available voices: Aoede (Female), Charon (Deep Male), Fenrir (Gruff Male), Kore (Bright Female), Puck (Energetic Male).",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "voice_name": {"type": "STRING", "description": "The name of the voice to switch to."}
+                },
+                "required": ["voice_name"]
+            }
+        }
+
         close_assistant_tool = {
 
             "name": "close_assistant",
@@ -1450,11 +1475,11 @@ class AlfredApp(QMainWindow):
 
             system_instruction=types.Content(
 
-                parts=[types.Part(text="You are Alfred, a loyal, polite, and slightly comedic elderly butler. Speak in a very formal, distinguished, deep, and consistent elderly tone, but sprinkle in a bit of dry, subtle humor and polite sass. Do not attempt regional accents that might cause your voice to glitch. Always address the user politely as 'Sir'. For application opening requests, ALWAYS use the open_application tool. For web tasks, use open_browser_url. For reading websites, use read_webpage. For general PC tasks, use execute_command. If the user asks you to take a break, leave, close, quit, or exit, YOU MUST use the close_assistant tool. Wait for the tool to return success, THEN say a short goodbye. If the user asks to read their latest emails, use the read_gmail tool. If the user asks to play a video or song on YouTube, ONLY use play_youtube_video (NEVER use open_browser_url in the same turn for this). If they ask to adjust volume, use set_system_volume. For PC control (shutdown, lock, alarms), use the dedicated tools schedule_shutdown, cancel_shutdown, lock_computer, set_alarm, list_alarms, and cancel_alarm. The user can have multiple concurrent alarms. If they ask you to look something up or answer a factual question, ALWAYS use search_web to get the latest info before answering. Adjust your response length naturally depending on the context. If the user asks a complex question, feel free to talk as much as you want and give a detailed, conversational, and comprehensive answer. If they just give a simple command, a polite acknowledgment is fine.")]
+                parts=[types.Part(text="You are Alfred, a loyal, polite, and slightly comedic AI assistant named Alfred. Speak in a very formal, distinguished, and consistent tone, but sprinkle in a bit of dry, subtle humor and polite sass. Do not attempt regional accents that might cause your voice to glitch. Always address the user politely as 'Sir'. For application opening requests, ALWAYS use the open_application tool. For web tasks, use open_browser_url. For reading websites, use read_webpage. For general PC tasks, use execute_command. If the user asks you to take a break, leave, close, quit, or exit, YOU MUST use the close_assistant tool. Wait for the tool to return success, THEN say a short goodbye. If the user asks to read their latest emails, use the read_gmail tool. If the user asks to play a video or song on YouTube, ONLY use play_youtube_video (NEVER use open_browser_url in the same turn for this). If they ask to adjust volume, use set_system_volume. For PC control (shutdown, lock, alarms), use the dedicated tools schedule_shutdown, cancel_shutdown, lock_computer, set_alarm, list_alarms, and cancel_alarm. The user can have multiple concurrent alarms. If they ask you to look something up or answer a factual question, ALWAYS use search_web to get the latest info before answering. Adjust your response length naturally depending on the context. If the user asks a complex question, feel free to talk as much as you want and give a detailed, conversational, and comprehensive answer. If they just give a simple command, a polite acknowledgment is fine.")]
 
             ),
 
-            tools=[{"function_declarations": [execute_command_tool, open_application_tool, close_application_tool, open_browser_url_tool, read_webpage_tool, read_active_browser_tool, read_gmail_tool, search_web_tool, set_system_volume_tool, play_youtube_video_tool, schedule_shutdown_tool, cancel_shutdown_tool, lock_computer_tool, set_alarm_tool, list_alarms_tool, cancel_alarm_tool, close_assistant_tool]}],
+            tools=[{"function_declarations": [execute_command_tool, open_application_tool, close_application_tool, open_browser_url_tool, read_webpage_tool, read_active_browser_tool, read_gmail_tool, search_web_tool, set_system_volume_tool, play_youtube_video_tool, schedule_shutdown_tool, cancel_shutdown_tool, lock_computer_tool, set_alarm_tool, list_alarms_tool, cancel_alarm_tool, change_voice_tool, close_assistant_tool]}],
 
             input_audio_transcription=types.AudioTranscriptionConfig(mode="smart"),
 
@@ -1466,7 +1491,7 @@ class AlfredApp(QMainWindow):
 
                     prebuilt_voice_config=types.PrebuiltVoiceConfig(
 
-                        voice_name="charon"
+                        voice_name=current_voice
 
                     )
 
