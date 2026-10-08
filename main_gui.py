@@ -836,32 +836,41 @@ class AlfredApp(QMainWindow):
                                 import json
                                 try:
                                     query = fc.args.get("query", "")
-                                    api_key = os.environ.get("GEMINI_SEARCH_API_KEY")
-                                    if not api_key:
-                                        api_key = os.environ.get("GEMINI_API_KEY")
+                                    snippets = "No live web results available."
+                                    try:
+                                        from ddgs import DDGS
+                                        with DDGS() as ddgs:
+                                            results = [r for r in ddgs.text(query, max_results=3)]
+                                        snippets = "\n".join([f"Source: {r.get('title')}\nInfo: {r.get('body')}" for r in results])
+                                    except Exception:
+                                        pass
                                         
-                                    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={api_key}"
-                                    payload = {
-                                        "contents": [{"parts": [{"text": query}]}],
-                                        "tools": [{"googleSearch": {}}]
-                                    }
-                                    headers = {"Content-Type": "application/json"}
-                                    resp = requests.post(url, headers=headers, json=payload, timeout=10)
-                                    
-                                    # Fallback to main API key if the search key is out of quota (429)
-                                    if resp.status_code == 429 and os.environ.get("GEMINI_API_KEY"):
-                                        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={os.environ.get('GEMINI_API_KEY')}"
+                                    api_key = os.environ.get("GROQ_API_KEY")
+                                    if api_key:
+                                        url = "https://api.groq.com/openai/v1/chat/completions"
+                                        headers = {
+                                            "Authorization": f"Bearer {api_key}",
+                                            "Content-Type": "application/json"
+                                        }
+                                        payload = {
+                                            "model": "qwen/qwen3.8-27b",
+                                            "messages": [
+                                                {"role": "system", "content": "You are a highly efficient search assistant. Read the provided web snippets and answer the user's query perfectly and concisely in 1-2 short sentences."},
+                                                {"role": "user", "content": f"Query: {query}\n\nWeb Snippets:\n{snippets}"}
+                                            ],
+                                            "max_tokens": 150
+                                        }
                                         resp = requests.post(url, headers=headers, json=payload, timeout=10)
-                                        
-                                    if resp.status_code == 200:
-                                        data = resp.json()
-                                        answer = data['candidates'][0]['content']['parts'][0]['text']
-                                        function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"results": answer[:2000]}))
+                                        if resp.status_code == 200:
+                                            data = resp.json()
+                                            answer = data['choices'][0]['message']['content']
+                                            function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"results": answer}))
+                                        else:
+                                            function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": f"Groq API Error {resp.status_code}: {resp.text[:500]}"}))
                                     else:
-                                        function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": f"Gemini API Error {resp.status_code}: {resp.text[:500]}"}))
+                                        function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": "GROQ_API_KEY is missing."}))
                                 except Exception as e:
                                     function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": str(e)}))
-
                             elif fc.name == "set_system_volume":
                                 try:
                                     from pycaw.pycaw import AudioUtilities
