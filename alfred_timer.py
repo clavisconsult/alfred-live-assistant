@@ -42,7 +42,22 @@ class AlfredTimer(QWidget):
         self.setLayout(self.layout)
 
         screen = QApplication.primaryScreen().geometry()
-        self.move(screen.width() - 280, 50)
+        # Stack multiple alarms vertically
+        import psutil
+        count = 0
+        for p in psutil.process_iter(['name', 'cmdline']):
+            try:
+                cmd = p.info['cmdline']
+                if cmd and 'alfred_timer.py' in ' '.join(cmd) and p.info['name'] == 'pythonw.exe':
+                    count += 1
+            except: pass
+        
+        y_offset = 50 + (130 * max(0, count - 1))
+        # Ensure it doesn't go off screen
+        if y_offset > screen.height() - 200:
+            y_offset = 50
+            
+        self.move(screen.width() - 280, y_offset)
         self.oldPos = self.pos()
 
     def format_time(self, seconds):
