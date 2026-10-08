@@ -832,17 +832,33 @@ class AlfredApp(QMainWindow):
                                 
 
                             elif fc.name == "search_web":
+                                import requests
+                                import json
                                 try:
-                                    from ddgs import DDGS
                                     query = fc.args.get("query", "")
-                                    with DDGS() as ddgs:
-                                        results = [r for r in ddgs.text(query, max_results=4)]
+                                    api_key = os.environ.get("GEMINI_SEARCH_API_KEY")
+                                    if not api_key:
+                                        api_key = os.environ.get("GEMINI_API_KEY")
                                         
-                                    if results:
-                                        snippets = "\n".join([f"Source: {r.get('title')}\nInfo: {r.get('body')}" for r in results])
-                                        function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"results": snippets[:2000]}))
+                                    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={api_key}"
+                                    payload = {
+                                        "contents": [{"parts": [{"text": query}]}],
+                                        "tools": [{"googleSearch": {}}]
+                                    }
+                                    headers = {"Content-Type": "application/json"}
+                                    resp = requests.post(url, headers=headers, json=payload, timeout=10)
+                                    
+                                    # Fallback to main API key if the search key is out of quota (429)
+                                    if resp.status_code == 429 and os.environ.get("GEMINI_API_KEY"):
+                                        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={os.environ.get('GEMINI_API_KEY')}"
+                                        resp = requests.post(url, headers=headers, json=payload, timeout=10)
+                                        
+                                    if resp.status_code == 200:
+                                        data = resp.json()
+                                        answer = data['candidates'][0]['content']['parts'][0]['text']
+                                        function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"results": answer[:2000]}))
                                     else:
-                                        function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": "No search results found."}))
+                                        function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": f"Gemini API Error {resp.status_code}: {resp.text[:500]}"}))
                                 except Exception as e:
                                     function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": str(e)}))
 
