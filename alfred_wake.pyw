@@ -16,14 +16,7 @@ app.setQuitOnLastWindowClosed(False)
 tray_icon = QSystemTrayIcon(QIcon(os.path.join(os.path.dirname(__file__), "alfred.ico")), app)
 tray_menu = QMenu()
 
-def set_mic_index(index):
-    with open("mic_config.json", "w") as f:
-        json.dump({"mic_index": index}, f)
-    # The stream will be re-created automatically in the loop if we set it to None, 
-    # but we need a way to communicate this to the listen_loop thread.
-    # A simple file touch or global variable works.
-    global force_mic_reload
-    force_mic_reload = True
+
 
 force_mic_reload = False
 mic_menu = tray_menu.addMenu("Microphone")
@@ -84,11 +77,28 @@ def launch_alfred():
         # Optimization: Bypass the Windows Shell/Shortcut resolver for instant kernel-level execution
         subprocess.Popen([sys.executable.replace("python.exe", "pythonw.exe"), ALFRED_APP_PATH], cwd=os.path.dirname(__file__))
 
+_cached_mic_index = -1
 def get_saved_mic_index():
+    global _cached_mic_index
+    if _cached_mic_index != -1: return _cached_mic_index
     try:
         with open("mic_config.json", "r") as f:
-            return json.load(f).get("mic_index", None)
-    except: return None
+            _cached_mic_index = json.load(f).get("mic_index", None)
+            return _cached_mic_index
+    except:
+        _cached_mic_index = None
+        return None
+
+def set_mic_index(index):
+    global _cached_mic_index
+    _cached_mic_index = index
+    try:
+        with open("mic_config.json", "w") as f:
+            json.dump({"mic_index": index}, f)
+    except: pass
+    global force_mic_reload
+    force_mic_reload = True
+
 
 def listen_loop():
     global force_mic_reload
@@ -114,16 +124,26 @@ def listen_loop():
                 continue
                 
             if stream is None:
+                import queue
+                audio_queue = queue.Queue()
+                def audio_callback(in_data, frame_count, time_info, status):
+                    audio_queue.put(in_data)
+                    return (None, pyaudio.paContinue)
+                
                 idx = get_saved_mic_index()
                 try:
-                    stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=2000, input_device_index=idx)
+                    stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=2000, input_device_index=idx, stream_callback=audio_callback)
                     stream.start_stream()
                 except Exception as e:
                     # Fallback to default
-                    stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=2000)
+                    stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=2000, stream_callback=audio_callback)
                     stream.start_stream()
-                
-            data = stream.read(2000, exception_on_overflow=False)
+            
+            try:
+                # Wait for audio data without blocking the GUI events
+                data = audio_queue.get(timeout=0.1)
+            except:
+                continue
             
             if recognizer.AcceptWaveform(data):
                 res = json.loads(recognizer.Result())
