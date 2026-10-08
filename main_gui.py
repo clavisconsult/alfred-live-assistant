@@ -88,7 +88,7 @@ INPUT_RATE = 16000
 
 OUTPUT_RATE = 24000
 
-CHUNK = 2048
+CHUNK = 1024
 
 
 
@@ -607,7 +607,6 @@ class AlfredApp(QMainWindow):
 
                 )
 
-                await asyncio.sleep(0.05) # HARD rate limit: Max 20 chunks per second
 
         except asyncio.CancelledError:
 
