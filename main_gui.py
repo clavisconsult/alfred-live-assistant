@@ -543,12 +543,10 @@ class AlfredApp(QMainWindow):
             stream_in = p.open(format=FORMAT, channels=CHANNELS, rate=INPUT_RATE, input=True, frames_per_buffer=CHUNK, input_device_index=mic_index)
             stream_out = p.open(format=FORMAT, channels=CHANNELS, rate=OUTPUT_RATE, output=True, frames_per_buffer=CHUNK)
         except Exception as e:
-
-                    with open("gui_error.log", "a") as f: f.write(f"Mic index {mic_index} failed to open: {e}
-")
-
-                    try:
-            # Fallback to default mic if specific one fails
+            with open("gui_error.log", "a") as f:
+                f.write(f"Mic index {mic_index} failed to open: {e}\n")
+            try:
+                # Fallback to default mic if specific one fails
                 stream_in = p.open(format=FORMAT, channels=CHANNELS, rate=INPUT_RATE, input=True, frames_per_buffer=CHUNK)
                 stream_out = p.open(format=FORMAT, channels=CHANNELS, rate=OUTPUT_RATE, output=True, frames_per_buffer=CHUNK)
             except Exception as e2:
