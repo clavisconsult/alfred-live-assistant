@@ -1469,6 +1469,14 @@ class AlfredApp(QMainWindow):
 
 
 
+        current_voice = "Charon"
+        try:
+            import json, os
+            if os.path.exists("alfred_config.json"):
+                with open("alfred_config.json", "r") as cfg:
+                    current_voice = json.load(cfg).get("voice", "Charon").capitalize()
+        except: pass
+        
         config = types.LiveConnectConfig(
 
             response_modalities=[types.Modality.AUDIO],
