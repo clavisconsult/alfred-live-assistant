@@ -844,6 +844,43 @@ class AlfredApp(QMainWindow):
                                 os.system("rundll32.exe user32.dll,LockWorkStation")
                                 function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"result": "Computer locked."}))
                                 
+                            elif fc.name == "list_alarms":
+                                import psutil
+                                active_alarms = []
+                                for p in psutil.process_iter(['name', 'cmdline']):
+                                    try:
+                                        cmd = p.info['cmdline']
+                                        if cmd and 'alfred_timer.py' in ' '.join(cmd) and p.info['name'] == 'pythonw.exe':
+                                            label = cmd[-1] if len(cmd) > 2 else "Unknown"
+                                            active_alarms.append(label)
+                                    except: pass
+                                
+                                if active_alarms:
+                                    response_text = "Active alarms: " + ", ".join(active_alarms)
+                                else:
+                                    response_text = "There are no active alarms currently set."
+                                function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"result": response_text}))
+                                
+                            elif fc.name == "cancel_alarm":
+                                import psutil
+                                target_label = fc.args.get("label", "").lower()
+                                killed_any = False
+                                for p in psutil.process_iter(['name', 'cmdline']):
+                                    try:
+                                        cmd = p.info['cmdline']
+                                        if cmd and 'alfred_timer.py' in ' '.join(cmd) and p.info['name'] == 'pythonw.exe':
+                                            label = cmd[-1] if len(cmd) > 2 else ""
+                                            if target_label == "all" or target_label in label.lower():
+                                                p.kill()
+                                                killed_any = True
+                                    except: pass
+                                
+                                if killed_any:
+                                    response_text = f"Successfully cancelled alarm(s) matching '{target_label}'."
+                                else:
+                                    response_text = f"Could not find any active alarms matching '{target_label}'."
+                                function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"result": response_text}))
+
                             elif fc.name == "set_alarm":
                                 minutes = float(fc.args.get("minutes", 0))
                                 label = fc.args.get("label", "Alarm")
@@ -1258,6 +1295,24 @@ class AlfredApp(QMainWindow):
             "parameters": {"type": "OBJECT", "properties": {}}
         }
         
+        list_alarms_tool = {
+            "name": "list_alarms",
+            "description": "Lists all currently active alarms and timers. Use this if the user asks what alarms are set.",
+            "parameters": {"type": "OBJECT", "properties": {}}
+        }
+        
+        cancel_alarm_tool = {
+            "name": "cancel_alarm",
+            "description": "Cancels a running alarm by providing its label (or part of it).",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "label": {"type": "STRING", "description": "The label of the alarm to cancel, or 'all' to cancel every alarm."}
+                },
+                "required": ["label"]
+            }
+        }
+
         set_alarm_tool = {
             "name": "set_alarm",
             "description": "Sets a local alarm/timer that will ring and show a popup after a specified number of minutes.",
@@ -1357,11 +1412,11 @@ class AlfredApp(QMainWindow):
 
             system_instruction=types.Content(
 
-                parts=[types.Part(text="You are Alfred, a loyal, polite, and slightly comedic elderly butler. Speak in a very formal, distinguished, deep, and consistent elderly tone, but sprinkle in a bit of dry, subtle humor and polite sass. Do not attempt regional accents that might cause your voice to glitch. Always address the user politely as 'Sir'. For application opening requests, ALWAYS use the open_application tool. For web tasks, use open_browser_url. For reading websites, use read_webpage. For general PC tasks, use execute_command. If the user asks you to take a break, leave, close, quit, or exit, YOU MUST use the close_assistant tool. Wait for the tool to return success, THEN say a short goodbye. If the user asks to read their latest emails, use the read_gmail tool. If the user asks to play a video or song on YouTube, ONLY use play_youtube_video (NEVER use open_browser_url in the same turn for this). If they ask to adjust volume, use set_system_volume. For PC control (shutdown, lock, alarms), use the dedicated tools schedule_shutdown, cancel_shutdown, lock_computer, and set_alarm. If they ask you to look something up or answer a factual question, ALWAYS use search_web to get the latest info before answering. CRITICAL RULES: 1. Keep your replies extremely concise and brief. 2. NEVER speak more than 1 or 2 short sentences per turn. 3. DO NOT exceed 15-20 words in your response unless you are actively explaining a complex topic the user specifically asked for. Speak fast, be highly direct, and avoid rambling.")]
+                parts=[types.Part(text="You are Alfred, a loyal, polite, and slightly comedic elderly butler. Speak in a very formal, distinguished, deep, and consistent elderly tone, but sprinkle in a bit of dry, subtle humor and polite sass. Do not attempt regional accents that might cause your voice to glitch. Always address the user politely as 'Sir'. For application opening requests, ALWAYS use the open_application tool. For web tasks, use open_browser_url. For reading websites, use read_webpage. For general PC tasks, use execute_command. If the user asks you to take a break, leave, close, quit, or exit, YOU MUST use the close_assistant tool. Wait for the tool to return success, THEN say a short goodbye. If the user asks to read their latest emails, use the read_gmail tool. If the user asks to play a video or song on YouTube, ONLY use play_youtube_video (NEVER use open_browser_url in the same turn for this). If they ask to adjust volume, use set_system_volume. For PC control (shutdown, lock, alarms), use the dedicated tools schedule_shutdown, cancel_shutdown, lock_computer, set_alarm, list_alarms, and cancel_alarm. The user can have multiple concurrent alarms. If they ask you to look something up or answer a factual question, ALWAYS use search_web to get the latest info before answering. CRITICAL RULES: 1. Keep your replies extremely concise and brief. 2. NEVER speak more than 1 or 2 short sentences per turn. 3. DO NOT exceed 15-20 words in your response unless you are actively explaining a complex topic the user specifically asked for. Speak fast, be highly direct, and avoid rambling.")]
 
             ),
 
-            tools=[{"function_declarations": [execute_command_tool, open_application_tool, close_application_tool, open_browser_url_tool, read_webpage_tool, read_active_browser_tool, read_gmail_tool, search_web_tool, set_system_volume_tool, play_youtube_video_tool, schedule_shutdown_tool, cancel_shutdown_tool, lock_computer_tool, set_alarm_tool, close_assistant_tool]}],
+            tools=[{"function_declarations": [execute_command_tool, open_application_tool, close_application_tool, open_browser_url_tool, read_webpage_tool, read_active_browser_tool, read_gmail_tool, search_web_tool, set_system_volume_tool, play_youtube_video_tool, schedule_shutdown_tool, cancel_shutdown_tool, lock_computer_tool, set_alarm_tool, list_alarms_tool, cancel_alarm_tool, close_assistant_tool]}],
 
             input_audio_transcription=types.AudioTranscriptionConfig(mode="smart"),
 
