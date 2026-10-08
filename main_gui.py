@@ -913,19 +913,24 @@ class AlfredApp(QMainWindow):
                             elif fc.name == "search_web":
                                 import requests
                                 import json
+                                import asyncio
                                 try:
                                     query = fc.args.get("query", "")
-                                    snippets = "No live web results available."
-                                    try:
-                                        from ddgs import DDGS
-                                        with DDGS() as ddgs:
-                                            results = [r for r in ddgs.text(query, max_results=3)]
-                                        snippets = "\n".join([f"Source: {r.get('title')}\nInfo: {r.get('body')}" for r in results])
-                                    except Exception:
-                                        pass
-                                        
-                                    api_key = os.environ.get("GROQ_API_KEY")
-                                    if api_key:
+                                    
+                                    def _run_search():
+                                        snippets = "No live web results available."
+                                        try:
+                                            from ddgs import DDGS
+                                            with DDGS() as ddgs:
+                                                results = [r for r in ddgs.text(query, max_results=3)]
+                                            snippets = "\n".join([f"Source: {r.get('title')}\nInfo: {r.get('body')}" for r in results])
+                                        except Exception:
+                                            pass
+                                            
+                                        api_key = os.environ.get("GROQ_API_KEY")
+                                        if not api_key:
+                                            return {"error": "GROQ_API_KEY is missing."}
+                                            
                                         url = "https://api.groq.com/openai/v1/chat/completions"
                                         headers = {
                                             "Authorization": f"Bearer {api_key}",
@@ -941,13 +946,11 @@ class AlfredApp(QMainWindow):
                                         }
                                         resp = requests.post(url, headers=headers, json=payload, timeout=10)
                                         if resp.status_code == 200:
-                                            data = resp.json()
-                                            answer = data['choices'][0]['message']['content']
-                                            function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"results": answer}))
-                                        else:
-                                            function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": f"Groq API Error {resp.status_code}: {resp.text[:500]}"}))
-                                    else:
-                                        function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": "GROQ_API_KEY is missing."}))
+                                            return {"results": resp.json()['choices'][0]['message']['content']}
+                                        return {"error": f"Groq API Error {resp.status_code}: {resp.text[:500]}"}
+                                        
+                                    res = await asyncio.to_thread(_run_search)
+                                    function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response=res))
                                 except Exception as e:
                                     function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response={"error": str(e)}))
                             elif fc.name == "set_system_volume":
@@ -966,11 +969,16 @@ class AlfredApp(QMainWindow):
                                 import urllib.parse
                                 import re
                                 import webbrowser
+                                import asyncio
                                 try:
                                     query = fc.args.get("query", "")
                                     url = f"https://www.youtube.com/results?search_query={urllib.parse.quote(query)}"
-                                    html = urllib.request.urlopen(url)
-                                    video_ids = re.findall(r"watch\?v=(\S{11})", html.read().decode())
+                                    
+                                    def _yt_fetch():
+                                        return urllib.request.urlopen(url).read().decode()
+                                        
+                                    html_decoded = await asyncio.to_thread(_yt_fetch)
+                                    video_ids = re.findall(r"watch\?v=(\S{11})", html_decoded)
                                     if video_ids:
                                         final_url = f"https://www.youtube.com/watch?v={video_ids[0]}"
                                         webbrowser.open(final_url)
@@ -1558,7 +1566,7 @@ class AlfredApp(QMainWindow):
 
                 await session.send(
 
-                    input="System: Briefly greet the user. (1 short sentence max)",
+                    input="System: Greet the user naturally based on your personality.",
 
                     end_of_turn=True
 
