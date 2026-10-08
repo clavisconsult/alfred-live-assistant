@@ -168,6 +168,7 @@ class AlfredApp(QMainWindow):
         
         self.cancel_event = threading.Event()
         self.pending_exit = False
+        self.exit_requested = False
         self.turn_completed_after_exit = False
         self.alfred_is_speaking = False
         self.speaker_cooldown = 0
@@ -333,6 +334,8 @@ class AlfredApp(QMainWindow):
                                     self.audio_out_queue.put(part.inline_data.data)
                                     
                         if content.turn_complete:
+                            if getattr(self, 'exit_requested', False):
+                                self.pending_exit = True
                             if getattr(self, 'pending_exit', False):
                                 self.turn_completed_after_exit = True
                             with open("gemini_transcript.log", "a") as f:
@@ -431,11 +434,11 @@ class AlfredApp(QMainWindow):
                                 function_responses.append(types.FunctionResponse(id=fc.id, name=fc.name, response=out))
                                 
                             elif fc.name == "close_assistant":
-                                self.pending_exit = True
+                                self.exit_requested = True
                                 function_responses.append(types.FunctionResponse(
                                     id=fc.id, 
                                     name=fc.name, 
-                                    response={"result": "Success. The assistant is now closing. Goodbye."}
+                                    response={"result": "Success. You may now say your final goodbye."}
                                 ))
 
                         await session.send_tool_response(function_responses=function_responses)
@@ -511,7 +514,7 @@ class AlfredApp(QMainWindow):
         config = types.LiveConnectConfig(
             response_modalities=[types.Modality.AUDIO],
             system_instruction=types.Content(
-                parts=[types.Part(text="You are Alfred, a loyal, polite, and slightly comedic elderly butler. Speak in a very formal, distinguished, deep, and consistent elderly tone, but sprinkle in a bit of dry, subtle humor and polite sass. Do not attempt regional accents that might cause your voice to glitch. Always address the user politely as 'Sir' or 'Madam'. For application opening requests, ALWAYS use the open_application tool. For web tasks, use open_browser_url. For reading websites, use read_webpage. For general PC tasks, use execute_command. If the user asks you to take a break, leave, close, quit, or exit, YOU MUST use the close_assistant tool and say a short goodbye. CRITICAL RULES: 1. Keep your replies extremely concise and brief. 2. NEVER speak more than 1 or 2 short sentences per turn. 3. DO NOT exceed 15-20 words in your response unless you are actively explaining a complex topic the user specifically asked for. Speak fast, be highly direct, and avoid rambling.")]
+                parts=[types.Part(text="You are Alfred, a loyal, polite, and slightly comedic elderly butler. Speak in a very formal, distinguished, deep, and consistent elderly tone, but sprinkle in a bit of dry, subtle humor and polite sass. Do not attempt regional accents that might cause your voice to glitch. Always address the user politely as 'Sir'. For application opening requests, ALWAYS use the open_application tool. For web tasks, use open_browser_url. For reading websites, use read_webpage. For general PC tasks, use execute_command. If the user asks you to take a break, leave, close, quit, or exit, YOU MUST use the close_assistant tool. Wait for the tool to return success, THEN say a short goodbye. CRITICAL RULES: 1. Keep your replies extremely concise and brief. 2. NEVER speak more than 1 or 2 short sentences per turn. 3. DO NOT exceed 15-20 words in your response unless you are actively explaining a complex topic the user specifically asked for. Speak fast, be highly direct, and avoid rambling.")]
             ),
             tools=[{"function_declarations": [execute_command_tool, open_application_tool, open_browser_url_tool, read_webpage_tool, close_assistant_tool]}],
             input_audio_transcription=types.AudioTranscriptionConfig(mode="smart"),
