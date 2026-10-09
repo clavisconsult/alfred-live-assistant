@@ -180,6 +180,11 @@ def listen_loop():
                         stream.stop_stream()
                         stream.close()
                         stream = None
+                    # Play immediate audio feedback so the user knows they were heard
+                    try:
+                        import winsound
+                        winsound.PlaySound("SystemHand", winsound.SND_ALIAS | winsound.SND_ASYNC)
+                    except: pass
                     launch_alfred()
                     time.sleep(5)
         except Exception as e:
